@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import Sidebar from './Sidebar';
-import TopBar from './TopBar';
-import ContentArea from './ContentArea';
-import UploadModal from './UploadModal';
-import ShareModal from './ShareModal';
+import Sidebar from '../../../pages/user/Sidebar';
+import TopBar from '../../../pages/user/TopBar';
+import ContentArea from '../../../pages/user/ContentArea';
+import UploadModal from '../../../pages/user/UploadModal';
+import ShareModal from '../../../pages/user/ShareModal';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('myFiles');
@@ -70,4 +70,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default MainLayout;
