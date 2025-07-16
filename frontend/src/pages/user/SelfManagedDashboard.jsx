@@ -1,8 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import DashboardHeader from "../../components/dashboard/DashboardHeader";
+import PathBar from "../../components/dashboard/PathBar";
+import SearchBar from "../../components/dashboard/SearchBar";
+import ActionsBar from "../../components/dashboard/ActionsBar";
+import FileDropzone from "../../components/dashboard/FileDropzone";
+import FileList from "../../components/dashboard/FileList";
 
 const SelfManagedDashboard = () => {
   const [aws, setAws] = useState(null);
+  const [path, setPath] = useState("/");
+  const [search, setSearch] = useState("");
+  const [files, setFiles] = useState([]); // Dummy files for now
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -11,6 +20,13 @@ const SelfManagedDashboard = () => {
       navigate('/');
     } else {
       setAws(JSON.parse(creds));
+      // Dummy files for UI
+      setFiles([
+        { id: 1, name: "Documents", type: "folder" },
+        { id: 2, name: "Resume.pdf", type: "file" },
+        { id: 3, name: "Photos", type: "folder" },
+        { id: 4, name: "Invoice.xlsx", type: "file" },
+      ]);
     }
   }, [navigate]);
 
@@ -19,20 +35,29 @@ const SelfManagedDashboard = () => {
     navigate('/');
   };
 
+  const handleNavigate = (newPath) => setPath("/" + newPath);
+  const handleSearch = (val) => setSearch(val);
+  const handleNewFolder = () => alert("New Folder Clicked");
+  const handleFilter = () => alert("Filter Clicked");
+  const handleDrop = (files) => alert(`Dropped ${files.length} file(s)`);
+  const handleFileClick = (file) => alert(`Open file: ${file.name}`);
+  const handleFolderClick = (folder) => alert(`Open folder: ${folder.name}`);
+  const handleAction = (action, file) => alert(`${action} ${file.name}`);
+
   if (!aws) return null;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-100 via-blue-50 to-blue-200">
-      <div className="bg-white/90 backdrop-blur-2xl p-10 rounded-3xl shadow-2xl flex flex-col gap-6 w-full max-w-lg border border-gray-200 z-10 mt-12 relative">
-        <button onClick={handleLogout} className="absolute top-4 right-4 text-blue-600 hover:text-blue-800 font-semibold text-sm bg-blue-50 px-4 py-2 rounded-lg shadow-sm">Logout</button>
-        <h2 className="text-3xl font-extrabold text-blue-700 text-center mb-2">Self-Managed S3 Dashboard</h2>
-        <p className="text-gray-600 text-center mb-4">Welcome! You are using your own AWS S3 bucket.</p>
-        <div className="bg-blue-50 rounded-lg p-4 text-blue-800 text-center">
-          <div><span className="font-semibold">Bucket:</span> {aws.bucket}</div>
-          <div><span className="font-semibold">Region:</span> {aws.region}</div>
+    <div className="min-h-screen bg-[#111113]">
+      <DashboardHeader title="CloudVault" bucketName={aws.bucket} onLogout={handleLogout} />
+      <main className="max-w-4xl mx-auto mt-10 rounded-2xl overflow-hidden shadow-xl bg-[#18181b]">
+        <PathBar path={path} onNavigate={handleNavigate} />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-6 py-4 bg-[#18181b]">
+          <SearchBar value={search} onChange={handleSearch} />
+          <ActionsBar onNewFolder={handleNewFolder} onFilter={handleFilter} />
         </div>
-        {/* TODO: Add S3 file operations here */}
-      </div>
+        <FileDropzone onDrop={handleDrop} />
+        <FileList files={files} onFileClick={handleFileClick} onFolderClick={handleFolderClick} onAction={handleAction} />
+      </main>
     </div>
   );
 };
