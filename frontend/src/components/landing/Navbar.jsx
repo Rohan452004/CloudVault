@@ -8,6 +8,7 @@ const Navbar = () => (
       <span>CloudVault</span>
     </Link>
     <div className="flex gap-4 items-center">
+      <a href="#storage-mode" className="text-blue-600 font-semibold px-4 py-2 rounded-lg border border-blue-200 hover:bg-blue-50 transition">Choose Storage Mode</a>
       <Link to="/auth/login" className="text-blue-700 font-semibold px-3 py-1 rounded hover:bg-blue-50 transition">Login</Link>
       <Link to="/auth/register" className="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-blue-700 transition">Sign Up</Link>
     </div>
