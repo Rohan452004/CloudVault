@@ -27,7 +27,7 @@ connectDB();
 // Routes
 app.use('/api/v1/auth', Auth);
 
-app.use("/api/s3",s3Routes);
+app.use("/api/v1/self/s3", s3Routes);
 
 
 app.get('/', (req, res) => {

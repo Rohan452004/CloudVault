@@ -1,0 +1,121 @@
+import React, { useState } from "react";
+import axiosInstance from "../../utils/axiosInstance";
+import { useAws } from "../../contexts/AwsContext";
+
+const COMMON_DURATIONS = [
+  { label: "15 min", value: 15, unit: "minutes" },
+  { label: "1 hour", value: 1, unit: "hours" },
+  { label: "1 day", value: 1, unit: "days" },
+  { label: "1 week", value: 7, unit: "days" },
+];
+
+const ShareModal = ({ open, file, onClose }) => {
+  const { aws } = useAws();
+  const [duration, setDuration] = useState(15);
+  const [unit, setUnit] = useState("minutes");
+  const [shareUrl, setShareUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  if (!open || !file) return null;
+
+  const handleCommon = (d) => {
+    setDuration(d.value);
+    setUnit(d.unit);
+  };
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    setError("");
+    setShareUrl("");
+    let expiresIn = duration;
+    if (unit === "hours") expiresIn *= 60;
+    if (unit === "days") expiresIn *= 60 * 24;
+    try {
+      const res = await axiosInstance.post("/self/s3/get-signed-url", {
+        accessKeyId: aws.accessKeyId,
+        secretAccessKey: aws.secretAccessKey,
+        bucket: aws.bucket,
+        region: aws.region,
+        key: file.key,
+        expires: expiresIn * 60, // seconds
+      });
+      setShareUrl(res.data.url);
+    } catch (err) {
+      setError("Failed to generate share link");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+      <div className="bg-[#18181b] rounded-lg shadow-lg p-8 max-w-md w-full relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl font-bold">&times;</button>
+        <h2 className="text-xl font-bold text-white mb-4">Share 1 Selected File(s)</h2>
+        <div className="mb-6">
+          <div className="text-white font-semibold mb-2">Set Link Expiration</div>
+          <div className="text-gray-400 mb-2">Choose how long the share link should remain valid:</div>
+          <div className="flex items-center gap-2 mb-4">
+            <label className="text-gray-300">Duration:</label>
+            <input
+              type="number"
+              min={1}
+              value={duration}
+              onChange={e => setDuration(Number(e.target.value))}
+              className="bg-black text-white border border-orange-500 rounded px-2 py-1 w-20"
+            />
+            <select
+              value={unit}
+              onChange={e => setUnit(e.target.value)}
+              className="bg-black text-white border border-gray-600 rounded px-2 py-1"
+            >
+              <option value="minutes">Minutes</option>
+              <option value="hours">Hours</option>
+              <option value="days">Days</option>
+            </select>
+          </div>
+          <div className="flex gap-2 mb-4">
+            {COMMON_DURATIONS.map(d => (
+              <button
+                key={d.label}
+                onClick={() => handleCommon(d)}
+                className="bg-[#23232a] text-white px-3 py-1 rounded hover:bg-orange-600 border border-gray-700"
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button
+          onClick={handleGenerate}
+          className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 rounded-lg text-lg mb-4 disabled:opacity-60"
+          disabled={loading}
+        >
+          {loading ? "Generating..." : "Generate Share Link"}
+        </button>
+        {error && <div className="text-red-400 mb-2 text-center">{error}</div>}
+        {shareUrl && (
+          <div className="bg-[#23232a] p-3 rounded text-white text-sm flex flex-col items-center">
+            <span className="mb-2">Shareable Link:</span>
+            <input
+              type="text"
+              value={shareUrl}
+              readOnly
+              className="w-full bg-black text-white border border-gray-700 rounded px-2 py-1 mb-2"
+              onFocus={e => e.target.select()}
+            />
+            <button
+              onClick={() => { navigator.clipboard.writeText(shareUrl); }}
+              className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-1 rounded"
+            >
+              Copy Link
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ShareModal; 

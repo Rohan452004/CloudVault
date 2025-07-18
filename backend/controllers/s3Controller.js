@@ -185,7 +185,7 @@ exports.listFiles = async (req, res) => {
 };
 
 exports.getSignedUrl = async (req, res) => {
-  const { accessKeyId, secretAccessKey, bucket, region, key } = req.body;
+  const { accessKeyId, secretAccessKey, bucket, region, key, expires } = req.body;
 
   if (!accessKeyId || !secretAccessKey || !bucket || !region || !key) {
     return res.status(400).json({ message: 'Missing AWS credentials, bucket info, or file key' });
@@ -202,7 +202,7 @@ exports.getSignedUrl = async (req, res) => {
     const params = {
       Bucket: bucket,
       Key: key,
-      Expires: 60 * 5, // 5 minutes
+      Expires: expires || 60 * 5, // default 5 minutes
     };
 
     const url = await s3.getSignedUrlPromise('getObject', params);
@@ -246,6 +246,62 @@ exports.createFolder = async (req, res) => {
     console.error('S3 create folder error:', error);
     return res.status(500).json({
       message: 'Failed to create folder in S3',
+      error: error.message,
+    });
+  }
+};
+
+exports.deleteFile = async (req, res) => {
+  const { accessKeyId, secretAccessKey, bucket, region, key } = req.body;
+
+  if (!accessKeyId || !secretAccessKey || !bucket || !region || !key) {
+    return res.status(400).json({ message: 'Missing AWS credentials, bucket info, or key' });
+  }
+
+  try {
+    const s3 = new AWS.S3({
+      accessKeyId,
+      secretAccessKey,
+      region,
+    });
+    // Only support single file delete
+    await s3.deleteObject({ Bucket: bucket, Key: key }).promise();
+    return res.status(200).json({ message: 'File deleted successfully', key });
+  } catch (error) {
+    console.error('S3 delete error:', error);
+    return res.status(500).json({
+      message: 'Failed to delete file from S3',
+      error: error.message,
+    });
+  }
+};
+
+exports.renameFile = async (req, res) => {
+  const { accessKeyId, secretAccessKey, bucket, region, oldKey, newKey } = req.body;
+
+  if (!accessKeyId || !secretAccessKey || !bucket || !region || !oldKey || !newKey) {
+    return res.status(400).json({ message: 'Missing AWS credentials, bucket info, or keys' });
+  }
+
+  try {
+    const s3 = new AWS.S3({
+      accessKeyId,
+      secretAccessKey,
+      region,
+    });
+
+    // Only support single file rename
+    await s3.copyObject({
+      Bucket: bucket,
+      CopySource: `${bucket}/${encodeURIComponent(oldKey)}`,
+      Key: newKey,
+    }).promise();
+    await s3.deleteObject({ Bucket: bucket, Key: oldKey }).promise();
+    return res.status(200).json({ message: 'File renamed successfully', oldKey, newKey });
+  } catch (error) {
+    console.error('S3 rename error:', error);
+    return res.status(500).json({
+      message: 'Failed to rename file in S3',
       error: error.message,
     });
   }

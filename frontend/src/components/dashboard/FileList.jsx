@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useAws } from "../../contexts/AwsContext";
-import axios from "axios";
+import axiosInstance from "../../utils/axiosInstance";
 import FilePreviewModal from "./FilePreviewModal";
+import ShareModal from "./ShareModal";
+import { toast } from "react-hot-toast";
 
 // Helper to infer MIME type from file extension
 const getMimeType = (fileName) => {
@@ -16,6 +18,7 @@ const getMimeType = (fileName) => {
   if (ext === "txt") return "text/plain";
   if (ext === "csv") return "text/csv";
   if (ext === "mp4") return "video/mp4";
+  if (ext === 'mov') return "video/mov";
   if (ext === "mp3") return "audio/mpeg";
   // Add more as needed
   return "";
@@ -27,6 +30,10 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [preview, setPreview] = useState({ open: false, url: '', type: '', name: '' });
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareFile, setShareFile] = useState(null);
 
   // Fetch files from S3 when component mounts, AWS credentials, path, or refreshKey changes
   useEffect(() => {
@@ -40,14 +47,12 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
     setError(null);
     
     try {
-      const response = await axios.post('http://localhost:3000/api/s3/list-files', {
+      const response = await axiosInstance.post('/self/s3/list-files', {
         accessKeyId: aws.accessKeyId,
         secretAccessKey: aws.secretAccessKey,
         bucket: aws.bucket,
         region: aws.region,
         prefix: currentPath
-      }, {
-        withCredentials: true
       });
 
       setS3Files(response.data.files);
@@ -69,40 +74,138 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   const handleFileClick = async (file) => {
     // Fetch signed URL for preview
     try {
-      const res = await axios.post('http://localhost:3000/api/s3/get-signed-url', {
+      const res = await axiosInstance.post('/self/s3/get-signed-url', {
         accessKeyId: aws.accessKeyId,
         secretAccessKey: aws.secretAccessKey,
         bucket: aws.bucket,
         region: aws.region,
         key: file.key,
-      }, { withCredentials: true });
+      });
       setPreview({ open: true, url: res.data.url, type: getMimeType(file.name), name: file.name });
     } catch (err) {
-      alert('Failed to get file preview URL');
+      toast.error('Failed to get file preview URL');
     }
-    onFileClick?.(file);
+    // Removed: onFileClick?.(file);
   };
 
   const handleAction = async (action, file) => {
     if (action === 'delete') {
-      // TODO: Implement delete functionality
-      console.log('Delete file:', file);
-    } else if (action === 'download') {
-      // Download using signed URL
+      if (!window.confirm(`Are you sure you want to delete '${file.name}'? This cannot be undone.`)) return;
       try {
-        const res = await axios.post('http://localhost:3000/api/s3/get-signed-url', {
+        await axiosInstance.post('/self/s3/delete', {
           accessKeyId: aws.accessKeyId,
           secretAccessKey: aws.secretAccessKey,
           bucket: aws.bucket,
           region: aws.region,
           key: file.key,
-        }, { withCredentials: true });
-        window.open(res.data.url, '_blank');
+        });
+        setS3Files(prev => prev.filter(f => f.key !== file.key));
+        toast.success('File deleted successfully');
       } catch (err) {
-        alert('Failed to get download URL');
+        toast.error('Failed to delete: ' + (err.response?.data?.message || err.message));
+      }
+    } else if (action === 'download') {
+      try {
+        const res = await axiosInstance.post('/self/s3/get-signed-url', {
+          accessKeyId: aws.accessKeyId,
+          secretAccessKey: aws.secretAccessKey,
+          bucket: aws.bucket,
+          region: aws.region,
+          key: file.key,
+        });
+        // Fetch the file as a blob
+        const fileRes = await fetch(res.data.url);
+        const blob = await fileRes.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(link);
+        }, 100);
+      } catch (err) {
+        toast.error('Failed to get download URL');
       }
     }
     onAction?.(action, file);
+  };
+
+  const handleRename = async (file) => {
+    const newName = window.prompt('Enter new name:', file.name);
+    if (!newName || newName === file.name) return;
+    let newKey;
+    if (file.type === 'folder') {
+      // Remove trailing slash, rename, add slash back
+      const parent = file.key.slice(0, file.key.lastIndexOf(file.name));
+      newKey = parent + newName + '/';
+    } else {
+      const parent = file.key.slice(0, file.key.lastIndexOf('/') + 1);
+      newKey = parent + newName;
+    }
+    try {
+      await axiosInstance.post('/self/s3/rename', {
+        accessKeyId: aws.accessKeyId,
+        secretAccessKey: aws.secretAccessKey,
+        bucket: aws.bucket,
+        region: aws.region,
+        oldKey: file.key,
+        newKey,
+      });
+      setS3Files([]); // force refresh
+      fetchS3Files();
+    } catch (err) {
+      toast.error('Failed to rename: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const startRename = (file) => {
+    setRenamingId(file.id || file.key);
+    setRenameValue(file.name);
+  };
+
+  const cancelRename = () => {
+    setRenamingId(null);
+    setRenameValue("");
+  };
+
+  const saveRename = async (file) => {
+    if (!renameValue || renameValue === file.name) {
+      cancelRename();
+      return;
+    }
+    let newKey;
+    if (file.type === 'folder') {
+      const parent = file.key.slice(0, file.key.lastIndexOf(file.name));
+      newKey = parent + renameValue + '/';
+    } else {
+      const parent = file.key.slice(0, file.key.lastIndexOf('/') + 1);
+      newKey = parent + renameValue;
+    }
+    try {
+      await axiosInstance.post('/self/s3/rename', {
+        accessKeyId: aws.accessKeyId,
+        secretAccessKey: aws.secretAccessKey,
+        bucket: aws.bucket,
+        region: aws.region,
+        oldKey: file.key,
+        newKey,
+      });
+      setRenamingId(null);
+      setRenameValue("");
+      setS3Files([]); // force refresh
+      fetchS3Files();
+    } catch (err) {
+      toast.error('Failed to rename: ' + (err.response?.data?.message || err.message));
+      setRenamingId(null); // Ensure renamingId is cleared on error too
+    }
+  };
+
+  const handleShare = (file) => {
+    setShareFile(file);
+    setShareModalOpen(true);
   };
 
   // Use S3 files if AWS credentials are available, otherwise use passed files prop
@@ -118,6 +221,10 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
     displayFiles = displayFiles.filter(f => f.type === 'file');
   } else if (filterType === 'folders') {
     displayFiles = displayFiles.filter(f => f.type === 'folder');
+  } else if (filterType === 'images') {
+    displayFiles = displayFiles.filter(f => getMimeType(f.name).startsWith('image/'));
+  } else if (filterType === 'videos') {
+    displayFiles = displayFiles.filter(f => getMimeType(f.name).startsWith('video/'));
   }
 
   const folders = displayFiles.filter(f => f.type === 'folder');
@@ -172,10 +279,36 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
             {/* Then files */}
             {regularFiles.map((file, idx) => (
               <li key={file.id || `file-${idx}`} className="flex items-center justify-between py-3 px-2 group hover:bg-[#23232a] rounded-lg transition">
-                <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleFileClick(file)}>
+                <div className="flex items-center gap-3">
                   <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24"><path d="M4 4h16v16H4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M8 4v16" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/></svg>
                   <div className="flex flex-col">
-                    <span className="text-gray-200 font-medium text-base">{file.name}</span>
+                    {renamingId === (file.id || file.key) ? (
+                      <div className="flex items-center gap-2 w-full">
+                        <input
+                          value={renameValue}
+                          onChange={e => setRenameValue(e.target.value)}
+                          className="bg-black text-white border border-orange-500 rounded px-2 py-1 w-full"
+                          autoFocus
+                          onKeyDown={e => {
+                            e.stopPropagation();
+                            if (e.key === "Enter") saveRename(file);
+                            if (e.key === "Escape") cancelRename();
+                          }}
+                          onClick={e => e.stopPropagation()}
+                        />
+                        <button onClick={e => { e.stopPropagation(); saveRename(file); }} className="text-green-500 text-lg px-1" title="Save">✔</button>
+                        <button onClick={e => { e.stopPropagation(); cancelRename(); }} className="text-red-500 text-lg px-1" title="Cancel">✖</button>
+                      </div>
+                    ) : (
+                      <span
+                        className="text-gray-200 font-medium text-base cursor-pointer hover:underline"
+                        onClick={() => {
+                          if (!renamingId) handleFileClick(file);
+                        }}
+                      >
+                        {file.name}
+                      </span>
+                    )}
                     {file.size && (
                       <span className="text-gray-500 text-sm">
                         {file.size < 1024 ? `${file.size} B` : 
@@ -186,11 +319,19 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
                   </div>
                 </div>
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition">
-                  <button onClick={() => handleAction('download', file)} className="text-emerald-400 hover:text-emerald-300">
+                  <button onClick={() => handleAction('download', file)} className="text-emerald-400 hover:text-emerald-300" title="Download">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M12 4v12m0 0l-4-4m4 4l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
-                  <button onClick={() => handleAction('delete', file)} className="text-red-500 hover:text-red-400">
+                  <button onClick={() => handleAction('delete', file)} className="text-red-500 hover:text-red-400" title="Delete">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                  {renamingId !== (file.id || file.key) && (
+                    <button onClick={e => { e.stopPropagation(); startRename(file); }} className="text-blue-400 hover:text-blue-300" title="Rename">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M16.862 5.487a2.25 2.25 0 113.182 3.182l-9.193 9.193a2 2 0 01-.707.464l-4.01 1.337a.5.5 0 01-.632-.632l1.337-4.01a2 2 0 01.464-.707l9.193-9.193z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                  )}
+                  <button onClick={e => { e.stopPropagation(); handleShare(file); }} className="text-orange-400 hover:text-orange-300" title="Share">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M4 12v2a4 4 0 004 4h8a4 4 0 004-4v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="6" r="4" stroke="currentColor" strokeWidth="2"/></svg>
                   </button>
                 </div>
               </li>
@@ -205,6 +346,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
         fileType={preview.type}
         fileName={preview.name}
       />
+      <ShareModal open={shareModalOpen} file={shareFile} onClose={() => setShareModalOpen(false)} />
     </>
   );
 };

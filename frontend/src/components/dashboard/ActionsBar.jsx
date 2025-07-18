@@ -25,6 +25,8 @@ const ActionsBar = ({ onNewFolder, onFilterChange }) => {
         <option value="all">All</option>
         <option value="files">Files</option>
         <option value="folders">Folders</option>
+        <option value="images">Images</option>
+        <option value="videos">Videos</option>
       </select>
     </div>
   );

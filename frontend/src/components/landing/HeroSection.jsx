@@ -6,6 +6,7 @@ import { BsFillPersonFill } from "react-icons/bs";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAws } from "../../contexts/AwsContext";
 import { toast } from "react-hot-toast";
+import axiosInstance from "../../utils/axiosInstance";
 
 
 const HeroSection = () => {
@@ -27,33 +28,19 @@ const HeroSection = () => {
     
 
     try {
-
-    const res = await fetch('http://localhost:3000/api/s3/self-connect', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-      credentials: 'include'
-    });
-
-    const data = await res.json();
-
-    if(res.ok){
-      console.log("Connected to self-managed S3:", data);
-       setAws(payload);
-       console.log("AWS credentials set in context:", aws);
-       toast.success("Connected to your AWS S3 bucket successfully!");
-       navigate('/self/dashboard');
-    } 
-    else{
-      alert(data.message || 'Error connecting AWS');
+      const res = await axiosInstance.post('/self/s3/self-connect', payload);
+      const data = res.data;
+      if(res.status === 200){
+        setAws(payload);
+        toast.success("Connected to your AWS S3 bucket successfully!");
+        navigate('/self/dashboard');
+      } else {
+        alert(data.message || 'Error connecting AWS');
+      }
+    } catch(err) {
+      console.error(err);
+      toast.error("Failed to connect to AWS S3. Please check your credentials.");
     }
-
-  }catch(err){
-    console.error(err);
-    toast.error("Failed to connect to AWS S3. Please check your credentials.");
-  }
 
   };
 

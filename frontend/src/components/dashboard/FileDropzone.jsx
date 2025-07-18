@@ -1,6 +1,6 @@
 // src/components/FileDropzone.jsx
 import React, { useRef, useState } from "react";
-import axios from "axios";
+import axiosInstance from "../../utils/axiosInstance";
 import { toast } from "react-hot-toast";
 import { useAws } from "../../contexts/AwsContext";
 
@@ -44,11 +44,10 @@ const FileDropzone = ({ onUploadSuccess, currentPath = "", refreshKey }) => {
     formData.append("key", key); // Pass the S3 key to the backend
 
     try {
-      const res = await axios.post("http://localhost:3000/api/s3/upload", formData, {
+      const res = await axiosInstance.post("/self/s3/upload", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-        withCredentials: true,
       });
 
       toast.success("File uploaded successfully");

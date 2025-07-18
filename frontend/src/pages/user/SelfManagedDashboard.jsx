@@ -7,7 +7,7 @@ import SearchBar from "../../components/dashboard/SearchBar";
 import ActionsBar from "../../components/dashboard/ActionsBar";
 import FileDropzone from "../../components/dashboard/FileDropzone";
 import FileList from "../../components/dashboard/FileList";
-import axios from "axios";
+import axiosInstance from "../../utils/axiosInstance";
 
 const SelfManagedDashboard = () => {
   const { aws, disconnectAws } = useAws();
@@ -45,13 +45,13 @@ const SelfManagedDashboard = () => {
     let folderPath = path ? path + folderName : folderName;
     if (!folderPath.endsWith('/')) folderPath += '/';
     try {
-      await axios.post('http://localhost:3000/api/s3/create-folder', {
+      await axiosInstance.post('/self/s3/create-folder', {
         accessKeyId: aws.accessKeyId,
         secretAccessKey: aws.secretAccessKey,
         bucket: aws.bucket,
         region: aws.region,
         folderPath,
-      }, { withCredentials: true });
+      });
       setRefreshKey(k => k + 1); // force FileList to reload
     } catch (err) {
       alert('Failed to create folder: ' + (err.response?.data?.message || err.message));
