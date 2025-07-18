@@ -46,45 +46,45 @@ exports.SelfManaged = async (req, res) => {
   }
 };
 
-exports.uploadFile = async (req, res) => {
-  const { accessKeyId, secretAccessKey, bucket, region, key } = req.body;
-  const file = req.file;
+// exports.uploadFile = async (req, res) => {
+//   const { accessKeyId, secretAccessKey, bucket, region, key } = req.body;
+//   const file = req.file;
 
-  if (!accessKeyId || !secretAccessKey || !bucket || !region || !file) {
-    return res.status(400).json({ message: 'Missing file or AWS credentials' });
-  }
+//   if (!accessKeyId || !secretAccessKey || !bucket || !region || !file) {
+//     return res.status(400).json({ message: 'Missing file or AWS credentials' });
+//   }
 
-  try {
-    const s3 = new S3Client({
-      region,
-      credentials: {
-        accessKeyId,
-        secretAccessKey,
-      },
-    });
+//   try {
+//     const s3 = new S3Client({
+//       region,
+//       credentials: {
+//         accessKeyId,
+//         secretAccessKey,
+//       },
+//     });
 
-    const uploadParams = {
-      Bucket: bucket,
-      Key: key || file.originalname,
-      Body: file.buffer,
-      ContentType: file.mimetype,
-    };
+//     const uploadParams = {
+//       Bucket: bucket,
+//       Key: key || file.originalname,
+//       Body: file.buffer,
+//       ContentType: file.mimetype,
+//     };
 
-    const command = new PutObjectCommand(uploadParams);
-    await s3.send(command);
+//     const command = new PutObjectCommand(uploadParams);
+//     await s3.send(command);
 
-    return res.status(200).json({
-      message: 'File uploaded successfully to S3',
-      filename: key || file.originalname,
-    });
-  } catch (error) {
-    console.error('Upload error:', error);
-    return res.status(500).json({
-      message: 'Failed to upload file to S3',
-      error: error.message,
-    });
-  }
-};
+//     return res.status(200).json({
+//       message: 'File uploaded successfully to S3',
+//       filename: key || file.originalname,
+//     });
+//   } catch (error) {
+//     console.error('Upload error:', error);
+//     return res.status(500).json({
+//       message: 'Failed to upload file to S3',
+//       error: error.message,
+//     });
+//   }
+// };
 
 exports.listFiles = async (req, res) => {
   const { accessKeyId, secretAccessKey, bucket, region, prefix = '' } = req.body;
@@ -304,5 +304,123 @@ exports.renameFile = async (req, res) => {
       message: 'Failed to rename file in S3',
       error: error.message,
     });
+  }
+};
+
+exports.getUploadUrl = async (req, res) => {
+  const { accessKeyId, secretAccessKey, bucket, region, key, contentType } = req.body;
+
+  if (!accessKeyId || !secretAccessKey || !bucket || !region || !key) {
+    return res.status(400).json({ message: 'Missing AWS credentials, bucket info, or file key' });
+  }
+
+  try {
+    const s3 = new AWS.S3({
+      accessKeyId,
+      secretAccessKey,
+      region,
+      signatureVersion: 'v4',
+    });
+
+    const params = {
+      Bucket: bucket,
+      Key: key,
+      Expires: 60 * 10, // 10 minutes
+      ContentType: contentType || 'application/octet-stream',
+    };
+
+    const url = await s3.getSignedUrlPromise('putObject', params);
+    return res.status(200).json({ url });
+  } catch (error) {
+    console.error('S3 getUploadUrl error:', error);
+    return res.status(500).json({
+      message: 'Failed to generate upload URL',
+      error: error.message,
+    });
+  }
+};
+
+exports.initiateMultipartUpload = async (req, res) => {
+  const { accessKeyId, secretAccessKey, bucket, region, key, contentType } = req.body;
+  if (!accessKeyId || !secretAccessKey || !bucket || !region || !key) {
+    return res.status(400).json({ message: 'Missing AWS credentials, bucket info, or file key' });
+  }
+  try {
+    const s3 = new AWS.S3({ accessKeyId, secretAccessKey, region, signatureVersion: 'v4' });
+    const params = {
+      Bucket: bucket,
+      Key: key,
+      ContentType: contentType || 'application/octet-stream',
+    };
+    const { UploadId } = await s3.createMultipartUpload(params).promise();
+    return res.status(200).json({ uploadId: UploadId });
+  } catch (error) {
+    console.error('S3 initiateMultipartUpload error:', error);
+    return res.status(500).json({ message: 'Failed to initiate multipart upload', error: error.message });
+  }
+};
+
+exports.getMultipartUploadUrls = async (req, res) => {
+  const { accessKeyId, secretAccessKey, bucket, region, key, uploadId, parts, contentType } = req.body;
+  if (!accessKeyId || !secretAccessKey || !bucket || !region || !key || !uploadId || !parts) {
+    return res.status(400).json({ message: 'Missing required parameters' });
+  }
+  try {
+    const s3 = new AWS.S3({ accessKeyId, secretAccessKey, region, signatureVersion: 'v4' });
+    const urls = await Promise.all(
+      parts.map(async (partNumber) => {
+        const params = {
+          Bucket: bucket,
+          Key: key,
+          UploadId: uploadId,
+          PartNumber: partNumber,
+          Expires: 60 * 10,
+        };
+        const url = await s3.getSignedUrlPromise('uploadPart', params);
+        return { partNumber, url };
+      })
+    );
+    return res.status(200).json({ urls });
+  } catch (error) {
+    console.error('S3 getMultipartUploadUrls error:', error);
+    return res.status(500).json({ message: 'Failed to get multipart upload URLs', error: error.message });
+  }
+};
+
+exports.completeMultipartUpload = async (req, res) => {
+  const { accessKeyId, secretAccessKey, bucket, region, key, uploadId, parts } = req.body;
+  if (!accessKeyId || !secretAccessKey || !bucket || !region || !key || !uploadId || !parts) {
+    return res.status(400).json({ message: 'Missing required parameters' });
+  }
+  try {
+    const s3 = new AWS.S3({ accessKeyId, secretAccessKey, region, signatureVersion: 'v4' });
+    const params = {
+      Bucket: bucket,
+      Key: key,
+      UploadId: uploadId,
+      MultipartUpload: {
+        Parts: parts.map(p => ({ ETag: p.ETag, PartNumber: p.PartNumber }))
+      }
+    };
+    const result = await s3.completeMultipartUpload(params).promise();
+    return res.status(200).json({ result });
+  } catch (error) {
+    console.error('S3 completeMultipartUpload error:', error);
+    return res.status(500).json({ message: 'Failed to complete multipart upload', error: error.message });
+  }
+};
+
+exports.abortMultipartUpload = async (req, res) => {
+  const { accessKeyId, secretAccessKey, bucket, region, key, uploadId } = req.body;
+  if (!accessKeyId || !secretAccessKey || !bucket || !region || !key || !uploadId) {
+    return res.status(400).json({ message: 'Missing required parameters' });
+  }
+  try {
+    const s3 = new AWS.S3({ accessKeyId, secretAccessKey, region, signatureVersion: 'v4' });
+    await s3.abortMultipartUpload({ Bucket: bucket, Key: key, UploadId: uploadId }).promise();
+    return res.status(200).json({ message: 'Upload aborted' });
+  } catch (error) {
+    console.error('S3 abortMultipartUpload error:', error);
+    return res.status(500).json({ message: 'Failed to abort multipart upload', error: error.message });
   }
 };

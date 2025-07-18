@@ -8,6 +8,7 @@ import ActionsBar from "../../components/dashboard/ActionsBar";
 import FileDropzone from "../../components/dashboard/FileDropzone";
 import FileList from "../../components/dashboard/FileList";
 import axiosInstance from "../../utils/axiosInstance";
+import { toast } from "react-hot-toast";
 
 const SelfManagedDashboard = () => {
   const { aws, disconnectAws } = useAws();
@@ -15,6 +16,7 @@ const SelfManagedDashboard = () => {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [storage, setStorage] = useState({ used: 0, total: 15 * 1024 * 1024 * 1024 }); // 15 GB default
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,6 +29,37 @@ const SelfManagedDashboard = () => {
   useEffect(() => {
     localStorage.setItem('cloudvault_path', path);
   }, [path]);
+
+  // Update fetchUsage to recursively sum all file sizes, including inside folders
+  useEffect(() => {
+    const fetchAllFiles = async (prefix = "") => {
+      const res = await axiosInstance.post('/self/s3/list-files', {
+        accessKeyId: aws.accessKeyId,
+        secretAccessKey: aws.secretAccessKey,
+        bucket: aws.bucket,
+        region: aws.region,
+        prefix
+      });
+      let totalSize = 0;
+      const files = res.data.files || [];
+      for (const f of files) {
+        if (f.type === 'file' && f.size) totalSize += f.size;
+        if (f.type === 'folder') {
+          totalSize += await fetchAllFiles(f.key);
+        }
+      }
+      return totalSize;
+    };
+    const fetchUsage = async () => {
+      try {
+        const totalSize = await fetchAllFiles("");
+        setStorage(s => ({ ...s, used: totalSize }));
+      } catch (err) {
+        toast.error('Failed to fetch storage usage');
+      }
+    };
+    if (aws.accessKeyId) fetchUsage();
+  }, [aws, refreshKey]);
 
   const handleLogout = () => {
     disconnectAws();
@@ -64,7 +97,9 @@ const SelfManagedDashboard = () => {
     // This will be handled by the FileList component internally
     console.log(`Opening folder: ${folder.name}`);
   };
-  const handleAction = (action, file) => alert(`${action} ${file.name}`);
+  const handleAction = (action, file) => {
+    toast(`${action} ${file.name}`);
+  };
 
   if (!aws.accessKeyId) return null;
 
@@ -76,6 +111,17 @@ const SelfManagedDashboard = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-6 py-4 bg-[#18181b]">
           <SearchBar value={search} onChange={handleSearch} />
           <ActionsBar onNewFolder={handleNewFolder} onFilterChange={handleFilterChange} />
+        </div>
+        <div className="w-full max-w-4xl mx-auto mt-6 mb-4">
+          <div className="bg-[#23232a] rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="text-white font-semibold">Storage Usage</div>
+            <div className="flex-1 flex flex-col md:flex-row md:items-center gap-2">
+              <div className="w-full md:w-64 bg-gray-700 rounded h-3 overflow-hidden">
+                <div className="bg-emerald-500 h-3 rounded" style={{ width: `${(storage.used / storage.total) * 100}%` }} />
+              </div>
+              <div className="text-gray-300 text-sm md:ml-4">{(storage.used / (1024*1024)).toFixed(0)} MB used</div>
+            </div>
+          </div>
         </div>
         <FileDropzone 
           onUploadSuccess={() => setRefreshKey(k => k + 1)} 

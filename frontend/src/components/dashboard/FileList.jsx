@@ -4,6 +4,7 @@ import axiosInstance from "../../utils/axiosInstance";
 import FilePreviewModal from "./FilePreviewModal";
 import ShareModal from "./ShareModal";
 import { toast } from "react-hot-toast";
+import { FaFilePdf, FaFileWord, FaFileExcel, FaFileArchive, FaFileAlt, FaFileImage, FaFileVideo, FaFileAudio, FaFileCode, FaFile } from "react-icons/fa";
 
 // Helper to infer MIME type from file extension
 const getMimeType = (fileName) => {
@@ -22,6 +23,20 @@ const getMimeType = (fileName) => {
   if (ext === "mp3") return "audio/mpeg";
   // Add more as needed
   return "";
+};
+
+const getFileIcon = (fileName) => {
+  const ext = fileName.split('.').pop().toLowerCase();
+  if (["jpg", "jpeg", "png", "gif", "bmp", "webp", "svg"].includes(ext)) return <FaFileImage className="text-blue-300" />;
+  if (["mp4", "mov", "avi", "mkv", "webm"].includes(ext)) return <FaFileVideo className="text-purple-400" />;
+  if (["mp3", "wav", "ogg", "aac"].includes(ext)) return <FaFileAudio className="text-pink-400" />;
+  if (["pdf"].includes(ext)) return <FaFilePdf className="text-red-500" />;
+  if (["doc", "docx"].includes(ext)) return <FaFileWord className="text-blue-500" />;
+  if (["xls", "xlsx", "csv"].includes(ext)) return <FaFileExcel className="text-green-500" />;
+  if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return <FaFileArchive className="text-yellow-500" />;
+  if (["js", "ts", "jsx", "tsx", "json", "html", "css", "py", "java", "c", "cpp", "cs", "go", "rb", "php", "sh"].includes(ext)) return <FaFileCode className="text-orange-400" />;
+  if (["txt", "md", "rtf"].includes(ext)) return <FaFileAlt className="text-gray-400" />;
+  return <FaFile className="text-gray-500" />;
 };
 
 const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPath = '', onPathChange, refreshKey = 0, search = '', filterType = 'all' }) => {
@@ -280,7 +295,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
             {regularFiles.map((file, idx) => (
               <li key={file.id || `file-${idx}`} className="flex items-center justify-between py-3 px-2 group hover:bg-[#23232a] rounded-lg transition">
                 <div className="flex items-center gap-3">
-                  <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24"><path d="M4 4h16v16H4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M8 4v16" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/></svg>
+                  {getFileIcon(file.name)}
                   <div className="flex flex-col">
                     {renamingId === (file.id || file.key) ? (
                       <div className="flex items-center gap-2 w-full">
