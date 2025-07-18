@@ -9,11 +9,13 @@ export const AuthContextProvider = ({ children }) => {
     const storedUser = localStorage.getItem("user");
     return storedUser ? JSON.parse(storedUser) : null;
   });
+
   
 
   useEffect(() => {
     if (user) {
       localStorage.setItem("user", JSON.stringify(user));
+      console.log("User set in localStorage:", user);
     } else {
       localStorage.removeItem("user");
     }
@@ -34,8 +36,18 @@ export const AuthContextProvider = ({ children }) => {
     }
   };
 
+  //mode 
+
+  const [mode, setMode] = useState(() => {
+  return localStorage.getItem('mode') || 'platform'; // default fallback
+  });
+
+useEffect(() => {
+  localStorage.setItem('mode', mode);
+}, [mode]);
+
   return (
-    <AuthContext.Provider value={{ user, setUser, logout }}>
+    <AuthContext.Provider value={{ user, setUser, logout, mode,setMode }}>
       {children}
     </AuthContext.Provider>
   );

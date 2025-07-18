@@ -3,16 +3,58 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { FaCloud, FaUserShield } from "react-icons/fa";
 import { BsFillPersonFill } from "react-icons/bs";
+import { useAuth } from "../../contexts/AuthContext";
+import { useAws } from "../../contexts/AwsContext";
+import { toast } from "react-hot-toast";
+
 
 const HeroSection = () => {
-  const [mode, setMode] = useState(null);
-  const [aws, setAws] = useState({ accessKeyId: '', secretAccessKey: '', bucket: '', region: '' });
+  const {aws, setAws} = useAws();
   const navigate = useNavigate();
+  const { mode, setMode } = useAuth();
 
-  const handleSelfSubmit = (e) => {
+  const handleSelfSubmit = async (e) => {
     e.preventDefault();
-    localStorage.setItem('selfS3', JSON.stringify(aws));
-    navigate('/self/dashboard');
+
+    const payload = {
+     mode: mode,
+     accessKeyId: aws.accessKeyId,
+     secretAccessKey: aws.secretAccessKey,
+     bucket: aws.bucket,
+     region: aws.region,
+    };
+
+    
+
+    try {
+
+    const res = await fetch('http://localhost:3000/api/s3/self-connect', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      credentials: 'include'
+    });
+
+    const data = await res.json();
+
+    if(res.ok){
+      console.log("Connected to self-managed S3:", data);
+       setAws(payload);
+       console.log("AWS credentials set in context:", aws);
+       toast.success("Connected to your AWS S3 bucket successfully!");
+       navigate('/self/dashboard');
+    } 
+    else{
+      alert(data.message || 'Error connecting AWS');
+    }
+
+  }catch(err){
+    console.error(err);
+    toast.error("Failed to connect to AWS S3. Please check your credentials.");
+  }
+
   };
 
   return (
@@ -60,7 +102,7 @@ const HeroSection = () => {
         </div>
       </div>
       {/* Storage Mode Selection */}
-      <div id="storage-mode" className="max-w-4xl mx-auto mt-20 flex flex-col items-center">
+      <div id="storage-mode" onClick={() => setMode('self')} className="max-w-4xl mx-auto mt-20 flex flex-col items-center">
         <h2 className="text-3xl font-bold text-blue-700 mb-8">Choose Your Storage Mode</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
           {/* Self-Managed Card */}
@@ -68,6 +110,7 @@ const HeroSection = () => {
             <div className={`absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full ${mode === 'self' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-600'}`}><FaUserShield size={22} /></div>
             <h3 className="text-xl font-bold text-blue-700 mb-2">Self-Managed S3</h3>
             <p className="text-gray-600 text-center mb-4">Connect your own AWS S3 bucket for full control and privacy. You manage your own storage and credentials.</p>
+            
             {mode === 'self' && (
               <form className="w-full flex flex-col gap-3 mt-2" onClick={e => e.stopPropagation()} onSubmit={handleSelfSubmit}>
                 <input type="text" placeholder="AWS Access Key ID" value={aws.accessKeyId} onChange={e => setAws(a => ({ ...a, accessKeyId: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
@@ -77,12 +120,21 @@ const HeroSection = () => {
                 <button type="submit" className="bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition mt-2">Continue</button>
               </form>
             )}
+
+
           </div>
           {/* Platform-Managed Card */}
-          <div className={`relative bg-white/90 border-2 rounded-2xl shadow-lg p-8 flex flex-col items-center transition-all duration-300 cursor-pointer ${mode === 'platform' ? 'border-blue-600 scale-105 ring-4 ring-blue-100' : 'border-blue-100 hover:scale-105'}`} onClick={() => setMode('platform')}>
+          <div
+            onClick={() => {
+              setMode('platform');
+              navigate('/auth/login'); // or '/auth/register'
+            }}
+            className={`relative bg-white/90 border-2 rounded-2xl shadow-lg p-8 flex flex-col items-center transition-all duration-300 cursor-pointer ${mode === 'platform' ? 'border-blue-600 scale-105 ring-4 ring-blue-100' : 'border-blue-100 hover:scale-105'}`}
+          >
             <div className={`absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full ${mode === 'platform' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-600'}`}><FaCloud size={22} /></div>
             <h3 className="text-xl font-bold text-blue-700 mb-2">Platform-Managed S3</h3>
             <p className="text-gray-600 text-center mb-4">Let CloudVault manage your storage securely. Sign up or log in to use our managed S3 bucket with your own private folder.</p>
+            {/* Always show the login/register buttons for platform mode */}
             {mode === 'platform' && (
               <div className="w-full flex flex-col gap-3 mt-2 items-center">
                 <Link to="/auth/register">
@@ -94,6 +146,7 @@ const HeroSection = () => {
               </div>
             )}
           </div>
+
         </div>
       </div>
     </section>
