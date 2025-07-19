@@ -4,6 +4,7 @@ const cookieParser = require('cookie-parser');
 const dotenv = require('dotenv');
 const {connectDB} = require('./config/db');
 const Auth = require('./routes/auth')
+const s3Routes = require('./routes/s3Routes');
 
 dotenv.config();
 
@@ -25,6 +26,9 @@ connectDB();
 
 // Routes
 app.use('/api/v1/auth', Auth);
+
+app.use("/api/v1/self/s3", s3Routes);
+
 
 app.get('/', (req, res) => {
   res.send('API is running');

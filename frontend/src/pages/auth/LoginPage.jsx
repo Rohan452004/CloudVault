@@ -5,6 +5,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useGoogleLogin } from "@react-oauth/google";
 
+
 const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,7 +25,7 @@ const LoginPage = () => {
       const response = await axiosInstance.post("/auth/login", { email, password });
       toast.success("Login successful!");
       setUser(response.data.user);
-      navigate("/user/dashboard");
+      navigate("/user/Dashboard");
     } catch (error) {
       toast.error(error.response?.data?.message || "Login failed");
     } finally {
