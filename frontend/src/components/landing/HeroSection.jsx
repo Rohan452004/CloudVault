@@ -7,12 +7,13 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useAws } from "../../contexts/AwsContext";
 import { toast } from "react-hot-toast";
 import axiosInstance from "../../utils/axiosInstance";
-
+import HowItWorksModal from "./HowItWorksModal";
 
 const HeroSection = () => {
   const {aws, setAws} = useAws();
   const navigate = useNavigate();
   const { mode, setMode } = useAuth();
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   const handleSelfSubmit = async (e) => {
     e.preventDefault();
@@ -99,13 +100,26 @@ const HeroSection = () => {
             <p className="text-gray-600 text-center mb-4">Connect your own AWS S3 bucket for full control and privacy. You manage your own storage and credentials.</p>
             
             {mode === 'self' && (
-              <form className="w-full flex flex-col gap-3 mt-2" onClick={e => e.stopPropagation()} onSubmit={handleSelfSubmit}>
-                <input type="text" placeholder="AWS Access Key ID" value={aws.accessKeyId} onChange={e => setAws(a => ({ ...a, accessKeyId: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
-                <input type="password" placeholder="AWS Secret Access Key" value={aws.secretAccessKey} onChange={e => setAws(a => ({ ...a, secretAccessKey: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
-                <input type="text" placeholder="S3 Bucket Name" value={aws.bucket} onChange={e => setAws(a => ({ ...a, bucket: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
-                <input type="text" placeholder="AWS Region (e.g. us-east-1)" value={aws.region} onChange={e => setAws(a => ({ ...a, region: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
-                <button type="submit" className="bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition mt-2">Continue</button>
-              </form>
+              <>
+                <div className="w-full flex justify-center mb-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowHowItWorks(true);
+                    }}
+                    className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center gap-2 underline"
+                  >
+                    How it works?
+                  </button>
+                </div>
+                <form className="w-full flex flex-col gap-3 mt-2" onClick={e => e.stopPropagation()} onSubmit={handleSelfSubmit}>
+                  <input type="text" placeholder="AWS Access Key ID" value={aws.accessKeyId} onChange={e => setAws(a => ({ ...a, accessKeyId: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
+                  <input type="password" placeholder="AWS Secret Access Key" value={aws.secretAccessKey} onChange={e => setAws(a => ({ ...a, secretAccessKey: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
+                  <input type="text" placeholder="S3 Bucket Name" value={aws.bucket} onChange={e => setAws(a => ({ ...a, bucket: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
+                  <input type="text" placeholder="AWS Region (e.g. us-east-1)" value={aws.region} onChange={e => setAws(a => ({ ...a, region: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
+                  <button type="submit" className="bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition mt-2">Continue</button>
+                </form>
+              </>
             )}
 
 
@@ -136,6 +150,7 @@ const HeroSection = () => {
 
         </div>
       </div>
+      <HowItWorksModal isOpen={showHowItWorks} onClose={() => setShowHowItWorks(false)} />
     </section>
   );
 };
