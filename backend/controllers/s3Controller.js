@@ -24,7 +24,26 @@ exports.SelfManaged = async (req, res) => {
       region,
     });
 
-    // Try listing the bucket objects (to verify access)
+    // 1. Check the bucket's actual region
+    let bucketRegion = region;
+    try {
+      const loc = await s3.getBucketLocation({ Bucket: bucket }).promise();
+      // AWS returns '' for us-east-1
+      bucketRegion = loc.LocationConstraint || 'us-east-1';
+      if (bucketRegion === 'EU') bucketRegion = 'eu-west-1'; // legacy EU
+    } catch (err) {
+      return res.status(403).json({
+        message: 'Failed to get bucket region. Please verify bucket name and credentials.',
+        error: err.message,
+      });
+    }
+    if (bucketRegion !== region) {
+      return res.status(400).json({
+        message: `Region mismatch: Bucket is in '${bucketRegion}', but you entered '${region}'.`,
+      });
+    }
+
+    // 2. Try listing the bucket objects (to verify access)
     await s3
       .listObjectsV2({
         Bucket: bucket,
