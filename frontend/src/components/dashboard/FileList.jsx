@@ -181,6 +181,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   const [folderActionLoading, setFolderActionLoading] = useState(false);
   const [folderSizes, setFolderSizes] = useState({});
   const [shareFolderModal, setShareFolderModal] = useState({ open: false, folder: null });
+  const [operationLoading, setOperationLoading] = useState(false);
 
   // Fetch files from S3 when component mounts, AWS credentials, path, or refreshKey changes
   useEffect(() => {
@@ -238,6 +239,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   const handleAction = async (action, file) => {
     if (action === 'delete') {
       if (!window.confirm(`Are you sure you want to delete '${file.name}'? This cannot be undone.`)) return;
+      setOperationLoading(true);
       try {
         await axiosInstance.post('/self/s3/delete', {
           accessKeyId: aws.accessKeyId,
@@ -251,8 +253,11 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
         onFileChange?.();
       } catch (err) {
         toast.error('Failed to delete: ' + (err.response?.data?.message || err.message));
+      } finally {
+        setOperationLoading(false);
       }
     } else if (action === 'download') {
+      setOperationLoading(true);
       try {
         const res = await axiosInstance.post('/self/s3/get-signed-url', {
           accessKeyId: aws.accessKeyId,
@@ -276,6 +281,8 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
         }, 100);
       } catch (err) {
         toast.error('Failed to get download URL');
+      } finally {
+        setOperationLoading(false);
       }
     }
     onAction?.(action, file);
@@ -293,6 +300,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       const parent = file.key.slice(0, file.key.lastIndexOf('/') + 1);
       newKey = parent + newName;
     }
+    setOperationLoading(true);
     try {
       await axiosInstance.post('/self/s3/rename', {
         accessKeyId: aws.accessKeyId,
@@ -307,6 +315,8 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       onFileChange?.();
     } catch (err) {
       toast.error('Failed to rename: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setOperationLoading(false);
     }
   };
 
@@ -328,6 +338,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
     if (file.type === 'folder') {
       const parent = file.key.slice(0, file.key.lastIndexOf(file.name));
       const newPrefix = parent + renameValue + '/';
+      setOperationLoading(true);
       try {
         await axiosInstance.post('/self/s3/rename-folder', {
           accessKeyId: aws.accessKeyId,
@@ -346,11 +357,14 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       } catch (err) {
         toast.error('Failed to rename folder: ' + (err.response?.data?.message || err.message));
         setRenamingId(null);
+      } finally {
+        setOperationLoading(false);
       }
     } else {
       let newKey;
       const parent = file.key.slice(0, file.key.lastIndexOf('/') + 1);
       newKey = parent + renameValue;
+      setOperationLoading(true);
       try {
         await axiosInstance.post('/self/s3/rename', {
           accessKeyId: aws.accessKeyId,
@@ -369,6 +383,8 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       } catch (err) {
         toast.error('Failed to rename: ' + (err.response?.data?.message || err.message));
         setRenamingId(null);
+      } finally {
+        setOperationLoading(false);
       }
     }
   };
@@ -382,6 +398,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
     if (action === 'delete') {
       if (!window.confirm(`Are you sure you want to delete the folder '${folder.name}' and all its contents? This cannot be undone.`)) return;
       setFolderActionLoading(true);
+      setOperationLoading(true);
       try {
         await axiosInstance.post('/self/s3/delete-folder', {
           accessKeyId: aws.accessKeyId,
@@ -395,14 +412,17 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
         onFileChange?.();
       } catch (err) {
         toast.error('Failed to delete folder: ' + (err.response?.data?.message || err.message));
+      } finally {
+        setFolderActionLoading(false);
+        setOperationLoading(false);
       }
-      setFolderActionLoading(false);
     } else if (action === 'rename') {
       const newName = window.prompt('Enter new folder name:', folder.name);
       if (!newName || newName === folder.name) return;
       const parent = folder.key.slice(0, folder.key.lastIndexOf(folder.name));
       const newPrefix = parent + newName + '/';
       setFolderActionLoading(true);
+      setOperationLoading(true);
       try {
         await axiosInstance.post('/self/s3/rename-folder', {
           accessKeyId: aws.accessKeyId,
@@ -417,10 +437,13 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
         onFileChange?.();
       } catch (err) {
         toast.error('Failed to rename folder: ' + (err.response?.data?.message || err.message));
+      } finally {
+        setFolderActionLoading(false);
+        setOperationLoading(false);
       }
-      setFolderActionLoading(false);
     } else if (action === 'download') {
       setFolderActionLoading(true);
+      setOperationLoading(true);
       try {
         const res = await axiosInstance.post('/self/s3/download-folder-zip', {
           accessKeyId: aws.accessKeyId,
@@ -441,8 +464,10 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
         }, 100);
       } catch (err) {
         toast.error('Failed to download folder: ' + (err.response?.data?.message || err.message));
+      } finally {
+        setFolderActionLoading(false);
+        setOperationLoading(false);
       }
-      setFolderActionLoading(false);
     }
   };
 
@@ -576,6 +601,17 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
           file={shareFolderModal.folder ? { ...shareFolderModal.folder, isFolder: true } : null}
           onClose={() => setShareFolderModal({ open: false, folder: null })}
         />
+        {operationLoading && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
+    <div className="flex flex-col items-center gap-4">
+      <svg className="animate-spin w-12 h-12 text-emerald-400" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+      </svg>
+      <span className="text-white text-lg font-semibold">Please wait...</span>
+    </div>
+  </div>
+)}
       </>
     );
   }
@@ -700,6 +736,17 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
         file={shareFolderModal.folder ? { ...shareFolderModal.folder, isFolder: true } : null}
         onClose={() => setShareFolderModal({ open: false, folder: null })}
       />
+      {operationLoading && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
+    <div className="flex flex-col items-center gap-4">
+      <svg className="animate-spin w-12 h-12 text-emerald-400" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+      </svg>
+      <span className="text-white text-lg font-semibold">Please wait...</span>
+    </div>
+  </div>
+)}
     </>
   );
 };
