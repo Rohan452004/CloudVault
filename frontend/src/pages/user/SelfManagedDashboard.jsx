@@ -102,10 +102,10 @@ const SelfManagedDashboard = () => {
   const handleFileClick = (file) => alert(`Open file: ${file.name}`);
   const handleFolderClick = (folder) => {
     // This will be handled by the FileList component internally
-    console.log(`Opening folder: ${folder.name}`);
+    // console.log(`Opening folder: ${folder.name}`);
   };
   const handleAction = (action, file) => {
-    toast(`${action} ${file.name}`);
+    // toast(`${action} ${file.name}`);
   };
 
   if (!aws.accessKeyId) return null;
