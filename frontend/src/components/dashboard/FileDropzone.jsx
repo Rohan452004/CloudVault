@@ -34,107 +34,103 @@ const FileDropzone = ({ onUploadSuccess, currentPath = "", refreshKey }) => {
     if (!files || files.length === 0) return;
     setUploading(true);
     setProgress(0);
-    const file = files[0];
-    let key = currentPath ? currentPath : "";
-    if (key && !key.endsWith('/')) key += '/';
-    key += file.name;
-    let uploadId = null;
-    try {
-      if (file.size < PART_SIZE) {
-        // Normal upload for files < 5MB
-        const presignRes = await axiosInstance.post("/self/s3/get-upload-url", {
-          accessKeyId: aws.accessKeyId,
-          secretAccessKey: aws.secretAccessKey,
-          bucket: aws.bucket,
-          region: aws.region,
-          key,
-          contentType: file.type || 'application/octet-stream',
-        });
-        const uploadUrl = presignRes.data.url;
-        const uploadRes = await fetch(uploadUrl, {
-          method: "PUT",
-          body: file,
-          headers: { "Content-Type": file.type || 'application/octet-stream' },
-        });
-        if (!uploadRes.ok) throw new Error('S3 upload failed');
-        setProgress(100);
-        toast.success("File uploaded successfully!");
-        onUploadSuccess?.();
-      } else {
-        // Multipart upload for files >= 5MB
-        // 1. Initiate multipart upload
-        const { data: { uploadId: newUploadId } } = await axiosInstance.post("/self/s3/initiate-multipart-upload", {
-          accessKeyId: aws.accessKeyId,
-          secretAccessKey: aws.secretAccessKey,
-          bucket: aws.bucket,
-          region: aws.region,
-          key,
-          contentType: file.type,
-        });
-        uploadId = newUploadId;
-        // 2. Split file into parts
-        const parts = [];
-        for (let start = 0, partNumber = 1; start < file.size; start += PART_SIZE, partNumber++) {
-          parts.push({ partNumber, start, end: Math.min(start + PART_SIZE, file.size) });
-        }
-        // 3. Get pre-signed URLs for each part
-        const { data: { urls } } = await axiosInstance.post("/self/s3/get-multipart-upload-urls", {
-          accessKeyId: aws.accessKeyId,
-          secretAccessKey: aws.secretAccessKey,
-          bucket: aws.bucket,
-          region: aws.region,
-          key,
-          uploadId,
-          parts: parts.map(p => p.partNumber),
-          contentType: file.type,
-        });
-        // 4. Upload each part
-        const etags = [];
-        for (let i = 0; i < parts.length; i++) {
-          const { partNumber, start, end } = parts[i];
-          const url = urls.find(u => u.partNumber === partNumber).url;
-          const blob = file.slice(start, end);
-          const res = await fetch(url, {
-            method: "PUT",
-            body: blob,
-            headers: { "Content-Type": file.type },
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      let key = currentPath ? currentPath : "";
+      if (key && !key.endsWith('/')) key += '/';
+      key += file.name;
+      let uploadId = null;
+      try {
+        if (file.size < PART_SIZE) {
+          // Normal upload for files < 5MB
+          const presignRes = await axiosInstance.post("/self/s3/get-upload-url", {
+            accessKeyId: aws.accessKeyId,
+            secretAccessKey: aws.secretAccessKey,
+            bucket: aws.bucket,
+            region: aws.region,
+            key,
+            contentType: file.type || 'application/octet-stream',
           });
-          if (!res.ok) throw new Error(`Upload failed for part ${partNumber}`);
-          const etag = res.headers.get("ETag")?.replace(/"/g, "");
-          etags.push({ ETag: etag, PartNumber: partNumber });
-          setProgress(Math.round(((i + 1) / parts.length) * 100));
+          const uploadUrl = presignRes.data.url;
+          const uploadRes = await fetch(uploadUrl, {
+            method: "PUT",
+            body: file,
+            headers: { "Content-Type": file.type || 'application/octet-stream' },
+          });
+          if (!uploadRes.ok) throw new Error('S3 upload failed');
+          setProgress(100);
+          toast.success(`File \"${file.name}\" uploaded successfully!`);
+          onUploadSuccess?.();
+        } else {
+          // Multipart upload for files >= 5MB
+          const { data: { uploadId: newUploadId } } = await axiosInstance.post("/self/s3/initiate-multipart-upload", {
+            accessKeyId: aws.accessKeyId,
+            secretAccessKey: aws.secretAccessKey,
+            bucket: aws.bucket,
+            region: aws.region,
+            key,
+            contentType: file.type,
+          });
+          uploadId = newUploadId;
+          const parts = [];
+          for (let start = 0, partNumber = 1; start < file.size; start += PART_SIZE, partNumber++) {
+            parts.push({ partNumber, start, end: Math.min(start + PART_SIZE, file.size) });
+          }
+          const { data: { urls } } = await axiosInstance.post("/self/s3/get-multipart-upload-urls", {
+            accessKeyId: aws.accessKeyId,
+            secretAccessKey: aws.secretAccessKey,
+            bucket: aws.bucket,
+            region: aws.region,
+            key,
+            uploadId,
+            parts: parts.map(p => p.partNumber),
+            contentType: file.type,
+          });
+          const etags = [];
+          for (let j = 0; j < parts.length; j++) {
+            const { partNumber, start, end } = parts[j];
+            const url = urls.find(u => u.partNumber === partNumber).url;
+            const blob = file.slice(start, end);
+            const res = await fetch(url, {
+              method: "PUT",
+              body: blob,
+              headers: { "Content-Type": file.type },
+            });
+            if (!res.ok) throw new Error(`Upload failed for part ${partNumber}`);
+            const etag = res.headers.get("ETag")?.replace(/"/g, "");
+            etags.push({ ETag: etag, PartNumber: partNumber });
+            setProgress(Math.round(((j + 1) / parts.length) * 100));
+          }
+          await axiosInstance.post("/self/s3/complete-multipart-upload", {
+            accessKeyId: aws.accessKeyId,
+            secretAccessKey: aws.secretAccessKey,
+            bucket: aws.bucket,
+            region: aws.region,
+            key,
+            uploadId,
+            parts: etags,
+          });
+          toast.success(`File \"${file.name}\" uploaded successfully!`);
+          onUploadSuccess?.();
         }
-        // 5. Complete multipart upload
-        await axiosInstance.post("/self/s3/complete-multipart-upload", {
-          accessKeyId: aws.accessKeyId,
-          secretAccessKey: aws.secretAccessKey,
-          bucket: aws.bucket,
-          region: aws.region,
-          key,
-          uploadId,
-          parts: etags,
-        });
-        toast.success("File uploaded successfully!");
-        onUploadSuccess?.();
+      } catch (error) {
+        console.error("Upload error:", error);
+        if (uploadId) {
+          await axiosInstance.post("/self/s3/abort-multipart-upload", {
+            accessKeyId: aws.accessKeyId,
+            secretAccessKey: aws.secretAccessKey,
+            bucket: aws.bucket,
+            region: aws.region,
+            key,
+            uploadId,
+          });
+        }
+        toast.error(`Upload failed for \"${file.name}\"`);
       }
-    } catch (error) {
-      console.error("Upload error:", error);
-      if (uploadId) {
-        // Abort multipart upload to clean up
-        await axiosInstance.post("/self/s3/abort-multipart-upload", {
-          accessKeyId: aws.accessKeyId,
-          secretAccessKey: aws.secretAccessKey,
-          bucket: aws.bucket,
-          region: aws.region,
-          key,
-          uploadId,
-        });
-      }
-      toast.error("Upload failed");
-    } finally {
-      setUploading(false);
-      setProgress(0);
+      setProgress(0); // Reset progress for next file
     }
+    setUploading(false);
   };
 
   return (
