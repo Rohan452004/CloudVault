@@ -107,6 +107,7 @@ const SelfManagedDashboard = () => {
   const handleAction = (action, file) => {
     // toast(`${action} ${file.name}`);
   };
+  const handleFileChange = () => setRefreshKey(k => k + 1);
 
   if (!aws.accessKeyId) return null;
 
@@ -150,6 +151,7 @@ const SelfManagedDashboard = () => {
           search={search}
           filterType={filterType}
           viewMode={viewMode}
+          onFileChange={handleFileChange}
         />
       </main>
     </div>

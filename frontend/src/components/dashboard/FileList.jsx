@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAws } from "../../contexts/AwsContext";
 import axiosInstance from "../../utils/axiosInstance";
 import FilePreviewModal from "./FilePreviewModal";
 import ShareModal from "./ShareModal";
 import { toast } from "react-hot-toast";
-import { FaFilePdf, FaFileWord, FaFileExcel, FaFileArchive, FaFileAlt, FaFileImage, FaFileVideo, FaFileAudio, FaFileCode, FaFile } from "react-icons/fa";
+import { FaFilePdf, FaFileWord, FaFileExcel, FaFileArchive, FaFileAlt, FaFileImage, FaFileVideo, FaFileAudio, FaFileCode, FaFile, FaEdit, FaTrash, FaDownload, FaFolder, FaShareAlt } from "react-icons/fa";
 
 // Helper to infer MIME type from file extension
 const getMimeType = (fileName) => {
@@ -39,7 +39,7 @@ const getFileIcon = (fileName) => {
   return <FaFile className="text-gray-500" />;
 };
 
-const FileGrid = ({ files, onFileClick, onFolderClick, onAction, startRename, renamingId, renameValue, setRenameValue, saveRename, cancelRename, handleShare, getFileIcon, getMimeType, aws }) => {
+const FileGrid = ({ files, onFileClick, onFolderClick, onAction, startRename, renamingId, renameValue, setRenameValue, saveRename, cancelRename, handleShare, getFileIcon, getMimeType, aws, onFolderAction, folderSizes }) => {
   const [thumbUrls, setThumbUrls] = useState({});
 
   useEffect(() => {
@@ -77,10 +77,41 @@ const FileGrid = ({ files, onFileClick, onFolderClick, onAction, startRename, re
         >
           {/* Folder */}
           {file.type === 'folder' ? (
-            <div className="flex flex-col items-center w-full" onClick={() => onFolderClick(file)}>
-              <svg className="w-12 h-12 text-emerald-400 mb-2" fill="none" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              <span className="text-gray-200 font-medium text-base truncate w-full text-center">{file.name}</span>
-            </div>
+            <>
+              <div className="flex flex-col items-center w-full" onClick={() => renamingId ? null : onFolderClick(file)}>
+                <FaFolder className="w-12 h-12 text-emerald-400 mb-2" />
+                {renamingId === (file.id || file.key) ? (
+                  <div className="flex items-center gap-2 w-full">
+                    <input
+                      value={renameValue}
+                      onChange={e => setRenameValue(e.target.value)}
+                      className="bg-black text-white border border-orange-500 rounded px-2 py-1 w-full"
+                      autoFocus
+                      onKeyDown={e => {
+                        e.stopPropagation();
+                        if (e.key === "Enter") saveRename(file);
+                        if (e.key === "Escape") cancelRename();
+                      }}
+                      onClick={e => e.stopPropagation()}
+                    />
+                    <button onClick={e => { e.stopPropagation(); saveRename(file); }} className="text-green-500 text-lg px-1" title="Save">✔</button>
+                    <button onClick={e => { e.stopPropagation(); cancelRename(); }} className="text-red-500 text-lg px-1" title="Cancel">✖</button>
+                  </div>
+                ) : (
+                  <span className="text-gray-200 font-medium text-base truncate w-full text-center cursor-pointer hover:underline">{file.name}</span>
+                )}
+                <span className="text-gray-500 text-xs mt-1">{folderSizes[file.key] !== undefined ? (folderSizes[file.key] < 1024 ? `${folderSizes[file.key]} B` : folderSizes[file.key] < 1024 * 1024 ? `${(folderSizes[file.key] / 1024).toFixed(1)} KB` : `${(folderSizes[file.key] / (1024 * 1024)).toFixed(1)} MB`) : '...'}</span>
+              </div>
+              {/* Folder actions overlay */}
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition z-10">
+                <button onClick={e => { e.stopPropagation(); onFolderAction('download', file); }} className="text-emerald-400 hover:text-emerald-300" title="Download as ZIP"><FaDownload /></button>
+                <button onClick={e => { e.stopPropagation(); onFolderAction('delete', file); }} className="text-red-500 hover:text-red-400" title="Delete Folder"><FaTrash /></button>
+                {renamingId !== (file.id || file.key) && (
+                  <button onClick={e => { e.stopPropagation(); startRename(file); }} className="text-blue-400 hover:text-blue-300" title="Rename Folder"><FaEdit /></button>
+                )}
+                <button onClick={e => { e.stopPropagation(); handleShareFolder(file); }} className="text-orange-400 hover:text-orange-300" title="Share Folder"><FaShareAlt /></button>
+              </div>
+            </>
           ) : (
             <>
               {/* File thumbnail or icon */}
@@ -120,22 +151,14 @@ const FileGrid = ({ files, onFileClick, onFolderClick, onAction, startRename, re
                   </span>
                 )}
               </div>
-              {/* Actions overlay */}
+              {/* Actions overlay for files */}
               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                <button onClick={e => { e.stopPropagation(); onAction('download', file); }} className="text-emerald-400 hover:text-emerald-300" title="Download">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M12 4v12m0 0l-4-4m4 4l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </button>
-                <button onClick={e => { e.stopPropagation(); onAction('delete', file); }} className="text-red-500 hover:text-red-400" title="Delete">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </button>
+                <button onClick={e => { e.stopPropagation(); onAction('download', file); }} className="text-emerald-400 hover:text-emerald-300" title="Download"><FaDownload /></button>
+                <button onClick={e => { e.stopPropagation(); onAction('delete', file); }} className="text-red-500 hover:text-red-400" title="Delete"><FaTrash /></button>
                 {renamingId !== (file.id || file.key) && (
-                  <button onClick={e => { e.stopPropagation(); startRename(file); }} className="text-blue-400 hover:text-blue-300" title="Rename">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M16.862 5.487a2.25 2.25 0 113.182 3.182l-9.193 9.193a2 2 0 01-.707.464l-4.01 1.337a.5.5 0 01-.632-.632l1.337-4.01a2 2 0 01.464-.707l9.193-9.193z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </button>
+                  <button onClick={e => { e.stopPropagation(); startRename(file); }} className="text-blue-400 hover:text-blue-300" title="Rename"><FaEdit /></button>
                 )}
-                <button onClick={e => { e.stopPropagation(); handleShare(file); }} className="text-orange-400 hover:text-orange-300" title="Share">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M4 12v2a4 4 0 004 4h8a4 4 0 004-4v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="6" r="4" stroke="currentColor" strokeWidth="2"/></svg>
-                </button>
+                <button onClick={e => { e.stopPropagation(); handleShare(file); }} className="text-orange-400 hover:text-orange-300" title="Share"><FaShareAlt /></button>
               </div>
             </>
           )}
@@ -145,7 +168,7 @@ const FileGrid = ({ files, onFileClick, onFolderClick, onAction, startRename, re
   );
 };
 
-const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPath = '', onPathChange, refreshKey = 0, search = '', filterType = 'all', viewMode = 'list' }) => {
+const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPath = '', onPathChange, refreshKey = 0, search = '', filterType = 'all', viewMode = 'list', onFileChange }) => {
   const { aws } = useAws();
   const [s3Files, setS3Files] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -155,6 +178,9 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   const [renameValue, setRenameValue] = useState("");
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareFile, setShareFile] = useState(null);
+  const [folderActionLoading, setFolderActionLoading] = useState(false);
+  const [folderSizes, setFolderSizes] = useState({});
+  const [shareFolderModal, setShareFolderModal] = useState({ open: false, folder: null });
 
   // Fetch files from S3 when component mounts, AWS credentials, path, or refreshKey changes
   useEffect(() => {
@@ -222,6 +248,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
         });
         setS3Files(prev => prev.filter(f => f.key !== file.key));
         toast.success('File deleted successfully');
+        onFileChange?.();
       } catch (err) {
         toast.error('Failed to delete: ' + (err.response?.data?.message || err.message));
       }
@@ -277,6 +304,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       });
       setS3Files([]); // force refresh
       fetchS3Files();
+      onFileChange?.();
     } catch (err) {
       toast.error('Failed to rename: ' + (err.response?.data?.message || err.message));
     }
@@ -297,30 +325,51 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       cancelRename();
       return;
     }
-    let newKey;
     if (file.type === 'folder') {
       const parent = file.key.slice(0, file.key.lastIndexOf(file.name));
-      newKey = parent + renameValue + '/';
+      const newPrefix = parent + renameValue + '/';
+      try {
+        await axiosInstance.post('/self/s3/rename-folder', {
+          accessKeyId: aws.accessKeyId,
+          secretAccessKey: aws.secretAccessKey,
+          bucket: aws.bucket,
+          region: aws.region,
+          oldPrefix: file.key,
+          newPrefix,
+        });
+        toast.success('Folder renamed successfully');
+        setRenamingId(null);
+        setRenameValue("");
+        setS3Files([]); // force refresh
+        fetchS3Files();
+        onFileChange?.();
+      } catch (err) {
+        toast.error('Failed to rename folder: ' + (err.response?.data?.message || err.message));
+        setRenamingId(null);
+      }
     } else {
+      let newKey;
       const parent = file.key.slice(0, file.key.lastIndexOf('/') + 1);
       newKey = parent + renameValue;
-    }
-    try {
-      await axiosInstance.post('/self/s3/rename', {
-        accessKeyId: aws.accessKeyId,
-        secretAccessKey: aws.secretAccessKey,
-        bucket: aws.bucket,
-        region: aws.region,
-        oldKey: file.key,
-        newKey,
-      });
-      setRenamingId(null);
-      setRenameValue("");
-      setS3Files([]); // force refresh
-      fetchS3Files();
-    } catch (err) {
-      toast.error('Failed to rename: ' + (err.response?.data?.message || err.message));
-      setRenamingId(null); // Ensure renamingId is cleared on error too
+      try {
+        await axiosInstance.post('/self/s3/rename', {
+          accessKeyId: aws.accessKeyId,
+          secretAccessKey: aws.secretAccessKey,
+          bucket: aws.bucket,
+          region: aws.region,
+          oldKey: file.key,
+          newKey,
+        });
+        toast.success('File renamed successfully');
+        setRenamingId(null);
+        setRenameValue("");
+        setS3Files([]); // force refresh
+        fetchS3Files();
+        onFileChange?.();
+      } catch (err) {
+        toast.error('Failed to rename: ' + (err.response?.data?.message || err.message));
+        setRenamingId(null);
+      }
     }
   };
 
@@ -328,6 +377,110 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
     setShareFile(file);
     setShareModalOpen(true);
   };
+
+  const handleFolderAction = async (action, folder) => {
+    if (action === 'delete') {
+      if (!window.confirm(`Are you sure you want to delete the folder '${folder.name}' and all its contents? This cannot be undone.`)) return;
+      setFolderActionLoading(true);
+      try {
+        await axiosInstance.post('/self/s3/delete-folder', {
+          accessKeyId: aws.accessKeyId,
+          secretAccessKey: aws.secretAccessKey,
+          bucket: aws.bucket,
+          region: aws.region,
+          prefix: folder.key,
+        });
+        toast.success('Folder deleted successfully');
+        fetchS3Files();
+        onFileChange?.();
+      } catch (err) {
+        toast.error('Failed to delete folder: ' + (err.response?.data?.message || err.message));
+      }
+      setFolderActionLoading(false);
+    } else if (action === 'rename') {
+      const newName = window.prompt('Enter new folder name:', folder.name);
+      if (!newName || newName === folder.name) return;
+      const parent = folder.key.slice(0, folder.key.lastIndexOf(folder.name));
+      const newPrefix = parent + newName + '/';
+      setFolderActionLoading(true);
+      try {
+        await axiosInstance.post('/self/s3/rename-folder', {
+          accessKeyId: aws.accessKeyId,
+          secretAccessKey: aws.secretAccessKey,
+          bucket: aws.bucket,
+          region: aws.region,
+          oldPrefix: folder.key,
+          newPrefix,
+        });
+        toast.success('Folder renamed successfully');
+        fetchS3Files();
+        onFileChange?.();
+      } catch (err) {
+        toast.error('Failed to rename folder: ' + (err.response?.data?.message || err.message));
+      }
+      setFolderActionLoading(false);
+    } else if (action === 'download') {
+      setFolderActionLoading(true);
+      try {
+        const res = await axiosInstance.post('/self/s3/download-folder-zip', {
+          accessKeyId: aws.accessKeyId,
+          secretAccessKey: aws.secretAccessKey,
+          bucket: aws.bucket,
+          region: aws.region,
+          prefix: folder.key,
+        }, { responseType: 'blob' });
+        const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/zip' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${folder.name}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(link);
+        }, 100);
+      } catch (err) {
+        toast.error('Failed to download folder: ' + (err.response?.data?.message || err.message));
+      }
+      setFolderActionLoading(false);
+    }
+  };
+
+  const handleShareFolder = (folder) => {
+    setShareFolderModal({ open: true, folder });
+  };
+
+  // Recursive folder size calculation
+  const fetchFolderSize = useCallback(async (prefix) => {
+    const res = await axiosInstance.post('/self/s3/list-files', {
+      accessKeyId: aws.accessKeyId,
+      secretAccessKey: aws.secretAccessKey,
+      bucket: aws.bucket,
+      region: aws.region,
+      prefix
+    });
+    let totalSize = 0;
+    const files = res.data.files || [];
+    for (const f of files) {
+      if (f.type === 'file' && f.size) totalSize += f.size;
+      if (f.type === 'folder') {
+        totalSize += await fetchFolderSize(f.key);
+      }
+    }
+    return totalSize;
+  }, [aws]);
+
+  useEffect(() => {
+    const fetchAllFolderSizes = async () => {
+      const folders = s3Files.filter(f => f.type === 'folder');
+      const newSizes = {};
+      for (const folder of folders) {
+        newSizes[folder.key] = await fetchFolderSize(folder.key);
+      }
+      setFolderSizes(newSizes);
+    };
+    if (s3Files.length > 0) fetchAllFolderSizes();
+  }, [s3Files, fetchFolderSize]);
 
   // Use S3 files if AWS credentials are available, otherwise use passed files prop
   let displayFiles = aws.accessKeyId ? s3Files : files;
@@ -401,6 +554,8 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
               getFileIcon={getFileIcon}
               getMimeType={getMimeType}
               aws={aws}
+              onFolderAction={handleFolderAction}
+              folderSizes={folderSizes}
             />
           )}
         </div>
@@ -411,7 +566,16 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
           fileType={preview.type}
           fileName={preview.name}
         />
-        <ShareModal open={shareModalOpen} file={shareFile} onClose={() => setShareModalOpen(false)} />
+        <ShareModal
+          open={shareModalOpen}
+          file={shareFile}
+          onClose={() => setShareModalOpen(false)}
+        />
+        <ShareModal
+          open={shareFolderModal.open}
+          file={shareFolderModal.folder ? { ...shareFolderModal.folder, isFolder: true } : null}
+          onClose={() => setShareFolderModal({ open: false, folder: null })}
+        />
       </>
     );
   }
@@ -428,12 +592,39 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
             {/* Folders first */}
             {folders.map((folder, idx) => (
               <li key={folder.id || `folder-${idx}`} className="flex items-center justify-between py-3 px-2 group hover:bg-[#23232a] rounded-lg transition">
-                <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleFolderClick(folder)}>
-                  <svg className="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  <span className="text-gray-200 font-medium text-base">{folder.name}</span>
+                <div className="flex items-center gap-3">
+                  <FaFolder className="w-6 h-6 text-emerald-400" />
+                  <div className="flex flex-col">
+                    {renamingId === (folder.id || folder.key) ? (
+                      <div className="flex items-center gap-2 w-full">
+                        <input
+                          value={renameValue}
+                          onChange={e => setRenameValue(e.target.value)}
+                          className="bg-black text-white border border-orange-500 rounded px-2 py-1 w-full"
+                          autoFocus
+                          onKeyDown={e => {
+                            e.stopPropagation();
+                            if (e.key === "Enter") saveRename(folder);
+                            if (e.key === "Escape") cancelRename();
+                          }}
+                          onClick={e => e.stopPropagation()}
+                        />
+                        <button onClick={e => { e.stopPropagation(); saveRename(folder); }} className="text-green-500 text-lg px-1" title="Save">✔</button>
+                        <button onClick={e => { e.stopPropagation(); cancelRename(); }} className="text-red-500 text-lg px-1" title="Cancel">✖</button>
+                      </div>
+                    ) : (
+                      <span className="text-gray-200 font-medium text-base cursor-pointer hover:underline" onClick={() => { if (!renamingId) handleFolderClick(folder); }}>{folder.name}</span>
+                    )}
+                    <span className="text-gray-500 text-xs ml-2">{folderSizes[folder.key] !== undefined ? (folderSizes[folder.key] < 1024 ? `${folderSizes[folder.key]} B` : folderSizes[folder.key] < 1024 * 1024 ? `${(folderSizes[folder.key] / 1024).toFixed(1)} KB` : `${(folderSizes[folder.key] / (1024 * 1024)).toFixed(1)} MB`) : '...'}</span>
+                  </div>
                 </div>
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition">
-                  {/* You can add folder actions here if needed */}
+                  <button onClick={() => handleFolderAction('download', folder)} className="text-emerald-400 hover:text-emerald-300" title="Download as ZIP"><FaDownload /></button>
+                  <button onClick={() => handleFolderAction('delete', folder)} className="text-red-500 hover:text-red-400" title="Delete Folder"><FaTrash /></button>
+                  {renamingId !== (folder.id || folder.key) && (
+                    <button onClick={e => { e.stopPropagation(); startRename(folder); }} className="text-blue-400 hover:text-blue-300" title="Rename Folder"><FaEdit /></button>
+                  )}
+                  <button onClick={e => { e.stopPropagation(); handleShareFolder(folder); }} className="text-orange-400 hover:text-orange-300" title="Share Folder"><FaShareAlt /></button>
                 </div>
               </li>
             ))}
@@ -480,20 +671,12 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
                   </div>
                 </div>
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition">
-                  <button onClick={() => handleAction('download', file)} className="text-emerald-400 hover:text-emerald-300" title="Download">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M12 4v12m0 0l-4-4m4 4l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </button>
-                  <button onClick={() => handleAction('delete', file)} className="text-red-500 hover:text-red-400" title="Delete">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </button>
+                  <button onClick={() => handleAction('download', file)} className="text-emerald-400 hover:text-emerald-300" title="Download"><FaDownload /></button>
+                  <button onClick={() => handleAction('delete', file)} className="text-red-500 hover:text-red-400" title="Delete"><FaTrash /></button>
                   {renamingId !== (file.id || file.key) && (
-                    <button onClick={e => { e.stopPropagation(); startRename(file); }} className="text-blue-400 hover:text-blue-300" title="Rename">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M16.862 5.487a2.25 2.25 0 113.182 3.182l-9.193 9.193a2 2 0 01-.707.464l-4.01 1.337a.5.5 0 01-.632-.632l1.337-4.01a2 2 0 01.464-.707l9.193-9.193z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    </button>
+                    <button onClick={e => { e.stopPropagation(); startRename(file); }} className="text-blue-400 hover:text-blue-300" title="Rename"><FaEdit /></button>
                   )}
-                  <button onClick={e => { e.stopPropagation(); handleShare(file); }} className="text-orange-400 hover:text-orange-300" title="Share">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M4 12v2a4 4 0 004 4h8a4 4 0 004-4v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="6" r="4" stroke="currentColor" strokeWidth="2"/></svg>
-                  </button>
+                  <button onClick={e => { e.stopPropagation(); handleShare(file); }} className="text-orange-400 hover:text-orange-300" title="Share"><FaShareAlt /></button>
                 </div>
               </li>
             ))}
@@ -507,7 +690,16 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
         fileType={preview.type}
         fileName={preview.name}
       />
-      <ShareModal open={shareModalOpen} file={shareFile} onClose={() => setShareModalOpen(false)} />
+      <ShareModal
+        open={shareModalOpen}
+        file={shareFile}
+        onClose={() => setShareModalOpen(false)}
+      />
+      <ShareModal
+        open={shareFolderModal.open}
+        file={shareFolderModal.folder ? { ...shareFolderModal.folder, isFolder: true } : null}
+        onClose={() => setShareFolderModal({ open: false, folder: null })}
+      />
     </>
   );
 };
