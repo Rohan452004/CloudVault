@@ -10,6 +10,8 @@ import FileList from "../../components/dashboard/FileList";
 import axiosInstance from "../../utils/axiosInstance";
 import { toast } from "react-hot-toast";
 
+const VIEW_MODE_KEY = 'cloudvault_view_mode';
+
 const SelfManagedDashboard = () => {
   const { aws, disconnectAws } = useAws();
   const [path, setPath] = useState(() => localStorage.getItem('cloudvault_path') || "");
@@ -17,6 +19,7 @@ const SelfManagedDashboard = () => {
   const [filterType, setFilterType] = useState("all");
   const [refreshKey, setRefreshKey] = useState(0);
   const [storage, setStorage] = useState({ used: 0, total: 15 * 1024 * 1024 * 1024 }); // 15 GB default
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem(VIEW_MODE_KEY) || 'list');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -29,6 +32,10 @@ const SelfManagedDashboard = () => {
   useEffect(() => {
     localStorage.setItem('cloudvault_path', path);
   }, [path]);
+
+  useEffect(() => {
+    localStorage.setItem(VIEW_MODE_KEY, viewMode);
+  }, [viewMode]);
 
   // Update fetchUsage to recursively sum all file sizes, including inside folders
   useEffect(() => {
@@ -110,7 +117,12 @@ const SelfManagedDashboard = () => {
         <PathBar path={path} onNavigate={handleNavigate} />
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-6 py-4 bg-[#18181b]">
           <SearchBar value={search} onChange={handleSearch} />
-          <ActionsBar onNewFolder={handleNewFolder} onFilterChange={handleFilterChange} />
+          <ActionsBar 
+            onNewFolder={handleNewFolder} 
+            onFilterChange={handleFilterChange} 
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+          />
         </div>
         <div className="w-full max-w-4xl mx-auto mt-6 mb-4">
           <div className="bg-[#23232a] rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -137,6 +149,7 @@ const SelfManagedDashboard = () => {
           refreshKey={refreshKey}
           search={search}
           filterType={filterType}
+          viewMode={viewMode}
         />
       </main>
     </div>

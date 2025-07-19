@@ -39,7 +39,113 @@ const getFileIcon = (fileName) => {
   return <FaFile className="text-gray-500" />;
 };
 
-const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPath = '', onPathChange, refreshKey = 0, search = '', filterType = 'all' }) => {
+const FileGrid = ({ files, onFileClick, onFolderClick, onAction, startRename, renamingId, renameValue, setRenameValue, saveRename, cancelRename, handleShare, getFileIcon, getMimeType, aws }) => {
+  const [thumbUrls, setThumbUrls] = useState({});
+
+  useEffect(() => {
+    // Preload signed URLs for image/video files
+    const fetchThumbs = async () => {
+      const newThumbs = {};
+      for (const file of files) {
+        if (file.type === 'file' && (getMimeType(file.name).startsWith('image/') || getMimeType(file.name).startsWith('video/'))) {
+          try {
+            const res = await axiosInstance.post('/self/s3/get-signed-url', {
+              accessKeyId: aws.accessKeyId,
+              secretAccessKey: aws.secretAccessKey,
+              bucket: aws.bucket,
+              region: aws.region,
+              key: file.key,
+            });
+            newThumbs[file.key] = res.data.url;
+          } catch {
+            // fallback to icon
+          }
+        }
+      }
+      setThumbUrls(newThumbs);
+    };
+    fetchThumbs();
+    // eslint-disable-next-line
+  }, [files]);
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
+      {files.map((file, idx) => (
+        <div
+          key={file.id || file.key || idx}
+          className="relative group bg-[#23232a] rounded-xl p-4 flex flex-col items-center justify-between shadow hover:shadow-lg transition cursor-pointer min-h-[140px]"
+        >
+          {/* Folder */}
+          {file.type === 'folder' ? (
+            <div className="flex flex-col items-center w-full" onClick={() => onFolderClick(file)}>
+              <svg className="w-12 h-12 text-emerald-400 mb-2" fill="none" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <span className="text-gray-200 font-medium text-base truncate w-full text-center">{file.name}</span>
+            </div>
+          ) : (
+            <>
+              {/* File thumbnail or icon */}
+              <div className="w-full flex flex-col items-center" onClick={() => renamingId ? null : onFileClick(file)}>
+                {getMimeType(file.name).startsWith('image/') && thumbUrls[file.key] ? (
+                  <img src={thumbUrls[file.key]} alt={file.name} className="w-16 h-16 object-cover rounded mb-2 border border-gray-700 mt-4" />
+                ) : getMimeType(file.name).startsWith('video/') && thumbUrls[file.key] ? (
+                  <video src={thumbUrls[file.key]} className="w-16 h-16 object-cover rounded mb-2 border border-gray-700 mt-4" controls={false} />
+                ) : (
+                  <span className="mb-2 text-4xl mt-4">{getFileIcon(file.name)}</span>
+                )}
+                {renamingId === (file.id || file.key) ? (
+                  <div className="flex items-center gap-2 w-full">
+                    <input
+                      value={renameValue}
+                      onChange={e => setRenameValue(e.target.value)}
+                      className="bg-black text-white border border-orange-500 rounded px-2 py-1 w-full"
+                      autoFocus
+                      onKeyDown={e => {
+                        e.stopPropagation();
+                        if (e.key === "Enter") saveRename(file);
+                        if (e.key === "Escape") cancelRename();
+                      }}
+                      onClick={e => e.stopPropagation()}
+                    />
+                    <button onClick={e => { e.stopPropagation(); saveRename(file); }} className="text-green-500 text-lg px-1" title="Save">✔</button>
+                    <button onClick={e => { e.stopPropagation(); cancelRename(); }} className="text-red-500 text-lg px-1" title="Cancel">✖</button>
+                  </div>
+                ) : (
+                  <span className="text-gray-200 font-medium text-base truncate w-full text-center cursor-pointer hover:underline">{file.name}</span>
+                )}
+                {file.size && (
+                  <span className="text-gray-500 text-xs mt-1">
+                    {file.size < 1024 ? `${file.size} B` : 
+                     file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(1)} KB` :
+                     `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
+                  </span>
+                )}
+              </div>
+              {/* Actions overlay */}
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                <button onClick={e => { e.stopPropagation(); onAction('download', file); }} className="text-emerald-400 hover:text-emerald-300" title="Download">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M12 4v12m0 0l-4-4m4 4l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+                <button onClick={e => { e.stopPropagation(); onAction('delete', file); }} className="text-red-500 hover:text-red-400" title="Delete">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+                {renamingId !== (file.id || file.key) && (
+                  <button onClick={e => { e.stopPropagation(); startRename(file); }} className="text-blue-400 hover:text-blue-300" title="Rename">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M16.862 5.487a2.25 2.25 0 113.182 3.182l-9.193 9.193a2 2 0 01-.707.464l-4.01 1.337a.5.5 0 01-.632-.632l1.337-4.01a2 2 0 01.464-.707l9.193-9.193z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                )}
+                <button onClick={e => { e.stopPropagation(); handleShare(file); }} className="text-orange-400 hover:text-orange-300" title="Share">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M4 12v2a4 4 0 004 4h8a4 4 0 004-4v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="6" r="4" stroke="currentColor" strokeWidth="2"/></svg>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPath = '', onPathChange, refreshKey = 0, search = '', filterType = 'all', viewMode = 'list' }) => {
   const { aws } = useAws();
   const [s3Files, setS3Files] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -267,6 +373,46 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
           </button>
         </div>
       </div>
+    );
+  }
+
+  // Modular grid view
+  if (viewMode === 'grid') {
+    return (
+      <>
+        <div className="w-full bg-[#18181b] rounded-b-2xl shadow-lg p-4 mt-2 min-h-[120px]">
+          {folders.length === 0 && regularFiles.length === 0 ? (
+            <div className="text-gray-500 text-center py-8">
+              {aws.accessKeyId ? 'No files or folders found in S3 bucket.' : 'No files or folders found.'}
+            </div>
+          ) : (
+            <FileGrid
+              files={[...folders, ...regularFiles]}
+              onFileClick={handleFileClick}
+              onFolderClick={handleFolderClick}
+              onAction={handleAction}
+              startRename={startRename}
+              renamingId={renamingId}
+              renameValue={renameValue}
+              setRenameValue={setRenameValue}
+              saveRename={saveRename}
+              cancelRename={cancelRename}
+              handleShare={handleShare}
+              getFileIcon={getFileIcon}
+              getMimeType={getMimeType}
+              aws={aws}
+            />
+          )}
+        </div>
+        <FilePreviewModal
+          open={preview.open}
+          onClose={() => setPreview({ open: false, url: '', type: '', name: '' })}
+          fileUrl={preview.url}
+          fileType={preview.type}
+          fileName={preview.name}
+        />
+        <ShareModal open={shareModalOpen} file={shareFile} onClose={() => setShareModalOpen(false)} />
+      </>
     );
   }
 
