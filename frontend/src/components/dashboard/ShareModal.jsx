@@ -32,15 +32,30 @@ const ShareModal = ({ open, file, onClose }) => {
     if (unit === "hours") expiresIn *= 60;
     if (unit === "days") expiresIn *= 60 * 24;
     try {
-      const res = await axiosInstance.post("/self/s3/get-signed-url", {
-        accessKeyId: aws.accessKeyId,
-        secretAccessKey: aws.secretAccessKey,
-        bucket: aws.bucket,
-        region: aws.region,
-        key: file.key,
-        expires: expiresIn * 60, // seconds
-      });
-      setShareUrl(res.data.url);
+      let url = "";
+      if (file.isFolder) {
+        // Call backend to get pre-signed URL for folder zip
+        const res = await axiosInstance.post("/self/s3/get-folder-zip-share-url", {
+          accessKeyId: aws.accessKeyId,
+          secretAccessKey: aws.secretAccessKey,
+          bucket: aws.bucket,
+          region: aws.region,
+          prefix: file.key,
+          expires: expiresIn * 60, // seconds
+        });
+        url = res.data.url;
+      } else {
+        const res = await axiosInstance.post("/self/s3/get-signed-url", {
+          accessKeyId: aws.accessKeyId,
+          secretAccessKey: aws.secretAccessKey,
+          bucket: aws.bucket,
+          region: aws.region,
+          key: file.key,
+          expires: expiresIn * 60, // seconds
+        });
+        url = res.data.url;
+      }
+      setShareUrl(url);
     } catch (err) {
       setError("Failed to generate share link");
     } finally {
@@ -52,47 +67,51 @@ const ShareModal = ({ open, file, onClose }) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
       <div className="bg-[#18181b] rounded-lg shadow-lg p-8 max-w-md w-full relative">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl font-bold">&times;</button>
-        <h2 className="text-xl font-bold text-white mb-4">Share 1 Selected File(s)</h2>
-        <div className="mb-6">
-          <div className="text-white font-semibold mb-2">Set Link Expiration</div>
-          <div className="text-gray-400 mb-2">Choose how long the share link should remain valid:</div>
-          <div className="flex items-center gap-2 mb-4">
-            <label className="text-gray-300">Duration:</label>
-            <input
-              type="number"
-              min={1}
-              value={duration}
-              onChange={e => setDuration(Number(e.target.value))}
-              className="bg-black text-white border border-orange-500 rounded px-2 py-1 w-20"
-            />
-            <select
-              value={unit}
-              onChange={e => setUnit(e.target.value)}
-              className="bg-black text-white border border-gray-600 rounded px-2 py-1"
-            >
-              <option value="minutes">Minutes</option>
-              <option value="hours">Hours</option>
-              <option value="days">Days</option>
-            </select>
-          </div>
-          <div className="flex gap-2 mb-4">
-            {COMMON_DURATIONS.map(d => (
-              <button
-                key={d.label}
-                onClick={() => handleCommon(d)}
-                className="bg-[#23232a] text-white px-3 py-1 rounded hover:bg-orange-600 border border-gray-700"
+        <h2 className="text-xl font-bold text-white mb-4">
+          Share {file.isFolder ? "Folder" : "1 Selected File(s)"}
+        </h2>
+        {!file.isFolder && (
+          <div className="mb-6">
+            <div className="text-white font-semibold mb-2">Set Link Expiration</div>
+            <div className="text-gray-400 mb-2">Choose how long the share link should remain valid:</div>
+            <div className="flex items-center gap-2 mb-4">
+              <label className="text-gray-300">Duration:</label>
+              <input
+                type="number"
+                min={1}
+                value={duration}
+                onChange={e => setDuration(Number(e.target.value))}
+                className="bg-black text-white border border-orange-500 rounded px-2 py-1 w-20"
+              />
+              <select
+                value={unit}
+                onChange={e => setUnit(e.target.value)}
+                className="bg-black text-white border border-gray-600 rounded px-2 py-1"
               >
-                {d.label}
-              </button>
-            ))}
+                <option value="minutes">Minutes</option>
+                <option value="hours">Hours</option>
+                <option value="days">Days</option>
+              </select>
+            </div>
+            <div className="flex gap-2 mb-4">
+              {COMMON_DURATIONS.map(d => (
+                <button
+                  key={d.label}
+                  onClick={() => handleCommon(d)}
+                  className="bg-[#23232a] text-white px-3 py-1 rounded hover:bg-orange-600 border border-gray-700"
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
         <button
           onClick={handleGenerate}
           className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 rounded-lg text-lg mb-4 disabled:opacity-60"
           disabled={loading}
         >
-          {loading ? "Generating..." : "Generate Share Link"}
+          {loading ? "Generating..." : file.isFolder ? "Generate Share Link for ZIP" : "Generate Share Link"}
         </button>
         {error && <div className="text-red-400 mb-2 text-center">{error}</div>}
         {shareUrl && (

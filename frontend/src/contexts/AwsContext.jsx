@@ -8,6 +8,7 @@ const initialAwsState = {
   secretAccessKey: '',
   bucket: '',
   region: '',
+  connected: false, // NEW
 };
 
 export const AwsContextProvider = ({ children }) => {
@@ -23,7 +24,8 @@ export const AwsContextProvider = ({ children }) => {
       aws.accessKeyId &&
       aws.secretAccessKey &&
       aws.bucket &&
-      aws.region
+      aws.region &&
+      aws.connected // Only persist if connected
     ) {
       localStorage.setItem('s3Credentials', JSON.stringify(aws));
     } else {

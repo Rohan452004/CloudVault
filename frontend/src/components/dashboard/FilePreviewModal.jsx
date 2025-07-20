@@ -38,36 +38,41 @@ const FilePreviewModal = ({ open, onClose, fileUrl, fileType, fileName }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-      <div className="bg-[#23232a] rounded-lg shadow-lg p-6 max-w-2xl w-full relative">
+      <div
+        className="bg-[#23232a] rounded-lg shadow-lg p-0 max-w-[70vw] w-[70vw] max-h-[70vh] h-[70vh] relative flex flex-col"
+        style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.7)" }}
+      >
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 text-gray-400 hover:text-white text-2xl font-bold"
+          className="absolute top-4 right-6 text-gray-400 hover:text-white text-3xl font-bold z-10"
         >
           &times;
         </button>
-        <h3 className="text-lg font-semibold text-white mb-4">{fileName}</h3>
-        <div className="flex items-center justify-center min-h-[300px] mt-8">
+        <h3 className="text-xl font-semibold text-white mb-2 mt-4 ml-8 mr-16 truncate" style={{ maxWidth: "calc(100% - 120px)" }}>{fileName}</h3>
+        <div className="flex-1 flex items-center justify-center w-full min-h-0 p-4">
           {isImage ? (
-            <img src={fileUrl} alt={fileName} className="max-h-[400px] max-w-full rounded shadow" />
+            <img src={fileUrl} alt={fileName} className="max-h-full max-w-full rounded shadow" style={{ objectFit: "contain", width: "100%", height: "100%" }} />
           ) : isVideo ? (
-            <video controls width="100%" style={{ maxHeight: 400 }}>
+            <video controls className="w-full h-full max-h-full max-w-full rounded bg-black" style={{ objectFit: "contain" }}>
               <source src={fileUrl} type={fileType} />
               Your browser does not support the video tag.
             </video>
           ) : isAudio ? (
-            <audio controls className="w-full">
-              <source src={fileUrl} type={fileType} />
-              Your browser does not support the audio tag.
-            </audio>
+            <div className="w-full flex flex-col items-center justify-center">
+              <audio controls className="w-full">
+                <source src={fileUrl} type={fileType} />
+                Your browser does not support the audio tag.
+              </audio>
+            </div>
           ) : isPdf ? (
             <iframe
               src={fileUrl}
               title={fileName}
-              className="w-full"
-              style={{ minHeight: 400, border: 0 }}
+              className="w-full h-full rounded"
+              style={{ minHeight: 0, border: 0 }}
             />
           ) : isText ? (
-            <div className="w-full max-h-[400px] overflow-auto bg-black text-green-200 rounded p-3 text-xs font-mono">
+            <div className="w-full h-full max-h-full overflow-auto bg-black text-green-200 rounded p-6 text-sm font-mono">
               {loadingText ? "Loading..." : textContent}
             </div>
           ) : isOffice ? (

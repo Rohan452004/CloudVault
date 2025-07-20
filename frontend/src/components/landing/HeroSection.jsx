@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { FaCloud, FaUserShield } from "react-icons/fa";
@@ -10,7 +10,7 @@ import axiosInstance from "../../utils/axiosInstance";
 import HowItWorksModal from "./HowItWorksModal";
 
 const HeroSection = () => {
-  const {aws, setAws} = useAws();
+  const {aws, setAws, disconnectAws} = useAws();
   const navigate = useNavigate();
   const { mode, setMode } = useAuth();
   const [showHowItWorks, setShowHowItWorks] = useState(false);
@@ -32,7 +32,7 @@ const HeroSection = () => {
       const res = await axiosInstance.post('/self/s3/self-connect', payload);
       const data = res.data;
       if(res.status === 200){
-        setAws(payload);
+        setAws({ ...payload, connected: true }); // set connected true
         toast.success("Connected to your AWS S3 bucket successfully!");
         navigate('/self/dashboard');
       } else {
@@ -116,7 +116,7 @@ const HeroSection = () => {
                   <input type="text" placeholder="AWS Access Key ID" value={aws.accessKeyId} onChange={e => setAws(a => ({ ...a, accessKeyId: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
                   <input type="password" placeholder="AWS Secret Access Key" value={aws.secretAccessKey} onChange={e => setAws(a => ({ ...a, secretAccessKey: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
                   <input type="text" placeholder="S3 Bucket Name" value={aws.bucket} onChange={e => setAws(a => ({ ...a, bucket: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
-                  <input type="text" placeholder="AWS Region (e.g. us-east-1)" value={aws.region} onChange={e => setAws(a => ({ ...a, region: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
+                 <input type="text" placeholder="AWS Region (e.g. us-east-1)" value={aws.region} onChange={e => setAws(a => ({ ...a, region: e.target.value }))} className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
                   <button type="submit" className="bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition mt-2">Continue</button>
                 </form>
               </>

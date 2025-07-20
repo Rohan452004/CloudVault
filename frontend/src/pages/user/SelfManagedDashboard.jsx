@@ -59,14 +59,17 @@ const SelfManagedDashboard = () => {
     };
     const fetchUsage = async () => {
       try {
-        const totalSize = await fetchAllFiles("");
-        setStorage(s => ({ ...s, used: totalSize }));
+        // Only fetch usage if we don't have it cached or if refreshKey changed
+        if (storage.used === 0 || refreshKey > 0) {
+          const totalSize = await fetchAllFiles("");
+          setStorage(s => ({ ...s, used: totalSize }));
+        }
       } catch (err) {
         toast.error('Failed to fetch storage usage');
       }
     };
     if (aws.accessKeyId) fetchUsage();
-  }, [aws, refreshKey]);
+  }, [aws, refreshKey, storage.used]);
 
   const handleLogout = () => {
     disconnectAws();
@@ -102,10 +105,15 @@ const SelfManagedDashboard = () => {
   const handleFileClick = (file) => alert(`Open file: ${file.name}`);
   const handleFolderClick = (folder) => {
     // This will be handled by the FileList component internally
-    console.log(`Opening folder: ${folder.name}`);
+    // console.log(`Opening folder: ${folder.name}`);
   };
   const handleAction = (action, file) => {
-    toast(`${action} ${file.name}`);
+    // toast(`${action} ${file.name}`);
+  };
+  const handleFileChange = () => {
+    setRefreshKey(k => k + 1);
+    // Force cache invalidation for current path when files change
+    // This will be handled by the FileList component's refreshKey change
   };
 
   if (!aws.accessKeyId) return null;
@@ -150,6 +158,7 @@ const SelfManagedDashboard = () => {
           search={search}
           filterType={filterType}
           viewMode={viewMode}
+          onFileChange={handleFileChange}
         />
       </main>
     </div>

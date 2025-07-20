@@ -19,13 +19,13 @@ function PublicRoute({ children }) {
   const { aws } = useAws();
   
   // Check if user has platform credentials OR self-managed credentials
-  const hasCredentials = user || (aws && aws.accessKeyId && aws.secretAccessKey && aws.bucket && aws.region);
+  const hasCredentials = user || (aws && aws.accessKeyId && aws.secretAccessKey && aws.bucket && aws.region && aws.connected);
   
   if (hasCredentials) {
     // Redirect to appropriate dashboard based on what credentials they have
     if (user) {
       return <Navigate to="/user/dashboard" replace />;
-    } else if (aws && aws.accessKeyId && aws.secretAccessKey && aws.bucket && aws.region) {
+    } else if (aws && aws.accessKeyId && aws.secretAccessKey && aws.bucket && aws.region && aws.connected) {
       return <Navigate to="/self/dashboard" replace />;
     }
   }
