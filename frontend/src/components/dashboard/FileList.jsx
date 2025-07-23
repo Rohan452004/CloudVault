@@ -54,6 +54,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   const [folderSizes, setFolderSizes] = useState({});
   const [shareFolderModal, setShareFolderModal] = useState({ open: false, folder: null });
   const [operationLoading, setOperationLoading] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState([]);
   
   // Cache for list requests
   const [listCache, setListCache] = useState({});
@@ -517,6 +518,121 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
     );
   }
 
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Delete ${selectedKeys.length} selected item(s)? This cannot be undone.`)) return;
+    setOperationLoading(true);
+    try {
+      await axiosInstance.post('/self/s3/bulk/bulk-delete', {
+        accessKeyId: aws.accessKeyId,
+        secretAccessKey: aws.secretAccessKey,
+        bucket: aws.bucket,
+        region: aws.region,
+        keys: selectedKeys,
+      });
+      const updatedFiles = s3Files.filter(f => !selectedKeys.includes(f.key));
+      setS3Files(updatedFiles);
+      setSelectedKeys([]);
+      updateCache(currentPath, updatedFiles);
+      toast.success('Selected items deleted.');
+      onFileChange?.();
+    } catch (err) {
+      toast.error('Bulk delete failed: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  const handleBulkDownload = async () => {
+    setOperationLoading(true);
+    try {
+      if (selectedKeys.length === 0) return;
+      // If only one folder, use existing folder zip logic
+      if (selectedKeys.length === 1) {
+        const item = s3Files.find(f => f.key === selectedKeys[0]);
+        if (item && item.type === 'folder') {
+          const res = await axiosInstance.post('/self/s3/download-folder-zip', {
+            accessKeyId: aws.accessKeyId,
+            secretAccessKey: aws.secretAccessKey,
+            bucket: aws.bucket,
+            region: aws.region,
+            prefix: item.key,
+          }, { responseType: 'blob' });
+          const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/zip' }));
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${item.name}.zip`;
+          document.body.appendChild(link);
+          link.click();
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(link);
+          }, 100);
+          toast.success('Folder downloaded as ZIP.');
+          setOperationLoading(false);
+          return;
+        }
+      }
+      // For multiple files/folders, request a zip from backend
+      const res = await axiosInstance.post('/self/s3/bulk/bulk-download-zip', {
+        accessKeyId: aws.accessKeyId,
+        secretAccessKey: aws.secretAccessKey,
+        bucket: aws.bucket,
+        region: aws.region,
+        keys: selectedKeys,
+      }, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/zip' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `CloudVault-Selected.zip`;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+      }, 100);
+      toast.success('Selected items downloaded as ZIP.');
+    } catch (err) {
+      toast.error('Bulk download failed: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  const handleBulkShare = async () => {
+    setOperationLoading(true);
+    try {
+      if (selectedKeys.length === 0) return;
+      // If only one folder, use existing folder share logic
+      if (selectedKeys.length === 1) {
+        const item = s3Files.find(f => f.key === selectedKeys[0]);
+        if (item && item.type === 'folder') {
+          // Open share modal for folder zip
+          setShareFile({ ...item, isFolder: true });
+          setShareModalOpen(true);
+          setOperationLoading(false);
+          return;
+        }
+      }
+
+      // For multiple files/folders, request a zip share link from backend
+      const res = await axiosInstance.post('/self/s3/bulk/bulk-share-zip', {
+        accessKeyId: aws.accessKeyId,
+        secretAccessKey: aws.secretAccessKey,
+        bucket: aws.bucket,
+        region: aws.region,
+        keys: selectedKeys,
+        expires: 60 * 60, // 1 hour default
+      });
+      // Open share modal for the generated zip link
+      setShareFile({ name: 'CloudVault-Selected.zip', url: res.data.url, isZip: true, keys: selectedKeys });
+      setShareModalOpen(true);
+    } catch (err) {
+      toast.error('Bulk share failed: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
   // Modular grid view
   if (viewMode === 'grid') {
     // Always use virtualized grid for all collections
@@ -575,6 +691,45 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   return (
     <>
       <div className="w-full bg-[#18181b] rounded-b-2xl shadow-lg p-4 mt-2 min-h-[120px]">
+        {viewMode !== 'grid' && (folders.length > 0 || regularFiles.length > 0) && (
+  <div className="flex items-center mb-2">
+    <input
+      type="checkbox"
+      checked={selectedKeys.length === (folders.length + regularFiles.length) && selectedKeys.length > 0}
+      onChange={e => {
+        if (e.target.checked) {
+          setSelectedKeys([...folders, ...regularFiles].map(f => f.key));
+        } else {
+          setSelectedKeys([]);
+        }
+      }}
+      className="mr-2 accent-emerald-500"
+    />
+    <span className="text-gray-300">Select All</span>
+    {selectedKeys.length > 0 && (
+      <>
+        <button
+          onClick={handleBulkDelete}
+          className="ml-4 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+        >
+          Delete Selected ({selectedKeys.length})
+        </button>
+        <button
+          onClick={handleBulkDownload}
+          className="ml-2 px-3 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm"
+        >
+          Download Selected
+        </button>
+        <button
+          onClick={handleBulkShare}
+          className="ml-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+        >
+          Share Selected
+        </button>
+      </>
+    )}
+  </div>
+)}
         {folders.length === 0 && regularFiles.length === 0 ? (
           <div className="text-gray-500 text-center py-8">
             {aws.accessKeyId ? 'No files or folders found in S3 bucket.' : 'No files or folders found.'}
@@ -585,6 +740,18 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
             {folders.map((folder, idx) => (
               <li key={folder.id || `folder-${idx}`} className="flex items-center justify-between py-3 px-2 group hover:bg-[#23232a] rounded-lg transition">
                 <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedKeys.includes(folder.key)}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setSelectedKeys(prev => [...prev, folder.key]);
+                      } else {
+                        setSelectedKeys(prev => prev.filter(k => k !== folder.key));
+                      }
+                    }}
+                    className="mr-2 accent-emerald-500"
+                  />
                   <FaFolder className="w-6 h-6 text-emerald-400" />
                   <div className="flex flex-col">
                     {renamingId === (folder.id || folder.key) ? (
@@ -624,6 +791,18 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
             {regularFiles.map((file, idx) => (
               <li key={file.id || `file-${idx}`} className="flex items-center justify-between py-3 px-2 group hover:bg-[#23232a] rounded-lg transition">
                 <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedKeys.includes(file.key)}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setSelectedKeys(prev => [...prev, file.key]);
+                      } else {
+                        setSelectedKeys(prev => prev.filter(k => k !== file.key));
+                      }
+                    }}
+                    className="mr-2 accent-emerald-500"
+                  />
                   {getFileIcon(file.name)}
                   <div className="flex flex-col">
                     {renamingId === (file.id || file.key) ? (

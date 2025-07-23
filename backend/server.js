@@ -5,7 +5,7 @@ const dotenv = require('dotenv');
 const {connectDB} = require('./config/db');
 const Auth = require('./routes/auth')
 const s3Routes = require('./routes/s3Routes');
-
+const s3BulkRoutes = require('./routes/s3bulkRoutes');
 dotenv.config();
 
 const app = express();
@@ -29,6 +29,8 @@ connectDB();
 app.use('/api/v1/auth', Auth);
 
 app.use("/api/v1/self/s3", s3Routes);
+
+app.use("/api/v1/self/s3/bulk", s3BulkRoutes);
 
 
 app.get('/', (req, res) => {
