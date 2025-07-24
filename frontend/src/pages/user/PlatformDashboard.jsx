@@ -20,7 +20,8 @@ const PlatformDashboard = () => {
   const [filterType, setFilterType] = useState("all");
   const [refreshKey, setRefreshKey] = useState(0);
   // Storage can be fetched from the user's plan or have a platform default
-  const [storage, setStorage] = useState({ used: 0, total: 15 * 1024 * 1024 * 1024 }); // 15 GB default
+  const STORAGE_CAP_MB = Number(import.meta.env.VITE_STORAGE_CAP_MB) || 50;
+  const [storage, setStorage] = useState({ used: 0, total: STORAGE_CAP_MB * 1024 * 1024 }); // 50 MB default
   const [viewMode, setViewMode] = useState(() => localStorage.getItem(VIEW_MODE_KEY) || 'list');
   const navigate = useNavigate();
 
@@ -133,7 +134,7 @@ const PlatformDashboard = () => {
               <div className="w-full md:w-64 bg-gray-700 rounded h-3 overflow-hidden">
                 <div className="bg-emerald-500 h-3 rounded" style={{ width: `${(storage.used / storage.total) * 100}%` }} />
               </div>
-              <div className="text-gray-300 text-sm md:ml-4">{(storage.used / (1024*1024)).toFixed(0)} MB used</div>
+              <div className="text-gray-300 text-sm md:ml-4">{(storage.used / (1024*1024)).toFixed(1)} MB used / {(storage.total / (1024*1024)).toFixed(0)} MB</div>
             </div>
           </div>
         </div>
@@ -141,6 +142,8 @@ const PlatformDashboard = () => {
           <FileDropzone 
             onUploadSuccess={() => setRefreshKey(k => k + 1)} 
             currentPath={path}
+            storage={storage}
+            setStorage={setStorage}
           />
         </div>
         <FileList 
