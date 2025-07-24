@@ -13,7 +13,7 @@ export const AuthContextProvider = ({ children }) => {
   useEffect(() => {
     if (user) {
       localStorage.setItem("user", JSON.stringify(user));
-      console.log("User set in localStorage:", user);
+    //   console.log("User set in localStorage:", user);
     } else {
       localStorage.removeItem("user");
     }
