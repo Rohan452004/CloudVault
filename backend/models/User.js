@@ -47,7 +47,7 @@ userSchema.pre('save', async function(next) {
         Key: key,
         Body: '', 
       }).promise();
-      console.log(`Created S3 folder: ${key}`);
+    //   console.log(`Created S3 folder: ${key}`);
     } catch (err) {
       console.error('Failed to create user S3 folder:', err);
     }

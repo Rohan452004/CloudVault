@@ -446,7 +446,7 @@ exports.getFolderZipShareUrl = async (req, res) => {
     }
   
     // Construct the full, user-specific path to the folder
-    // const fullPrefix = getUserPrefix(id, prefix);
+    const fullPrefix = getUserPrefix(id, prefix);
 
     console.log("fullPrefix", fullPrefix);
   
@@ -477,7 +477,7 @@ exports.getFolderZipShareUrl = async (req, res) => {
   
       // Create a unique name for the temporary zip file in a shared location
       const folderName = prefix.replace(/\/$/, '').split('/').pop() || 'archive';
-      const zipKey = `shared-zips/${folderName}-${Date.now()}.zip`;
+      const zipKey = `users/${id}/shared-zips/${folderName}-${Date.now()}.zip`;
   
       // Upload the generated zip file back to S3
       await s3.upload({
