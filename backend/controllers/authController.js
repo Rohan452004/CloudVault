@@ -7,7 +7,7 @@ const axios = require('axios');
 
 exports.register = async (req, res) => {
   try {
-    console.log("INSIDE REGISTER USER")
+    // console.log("INSIDE REGISTER USER")
     const { username, email, password } = req.body;
     if (!username || !email || !password) {
       return res.status(400).json(
@@ -77,7 +77,7 @@ exports.login = async (req, res) => {
 };
 
 exports.googleLogin = async (req, res) => {
-  console.log("Inside Google Login");
+//   console.log("Inside Google Login");
   try {
     const { token } = req.body;
     if (!token) {
