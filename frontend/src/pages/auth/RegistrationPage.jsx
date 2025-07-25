@@ -3,6 +3,7 @@ import { toast } from "react-hot-toast";
 import axiosInstance from "../../utils/axiosInstance";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { FaHome } from "react-icons/fa";
 
 const RegistrationPage = () => {
   const [username, setUsername] = useState("");
@@ -37,6 +38,11 @@ const RegistrationPage = () => {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 via-blue-50 to-blue-200 overflow-hidden">
+      {/* Back to Home Button */}
+      <Link to="/" className="fixed top-4 right-4 z-20 flex items-center gap-2 bg-white/90 border border-blue-200 text-blue-700 px-4 py-2 rounded-lg font-semibold shadow hover:bg-blue-50 transition text-sm">
+        <FaHome className="w-4 h-4" />
+        Back Home
+      </Link>
       {/* Gradient Blobs */}
       <div className="absolute -top-32 -left-32 w-96 h-96 bg-gradient-to-br from-blue-400 via-blue-200 to-blue-100 opacity-30 rounded-full blur-3xl animate-pulse -z-10" />
       <div className="absolute bottom-0 right-0 w-80 h-80 bg-gradient-to-tr from-blue-300 via-blue-200 to-blue-100 opacity-20 rounded-full blur-2xl animate-pulse -z-10" />

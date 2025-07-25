@@ -105,7 +105,7 @@ useEffect(() => {
       requestedThumbsRef.current.add(file.key);
       // Make API request for thumbnail
       axiosInstance.post('/self/s3/get-signed-url', {...});
-    }
+  }
   });
 }, [aws, JSON.stringify(firstNMedia.map(f => f.key))]);
 ```

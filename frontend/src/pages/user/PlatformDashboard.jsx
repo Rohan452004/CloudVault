@@ -145,7 +145,7 @@ const PlatformDashboard = () => {
             storage={storage}
             setStorage={setStorage}
           />
-        </div>
+      </div>
         <FileList 
           currentPath={path}
           onPathChange={setPath}
