@@ -101,14 +101,14 @@ const FileDropzone = ({ onUploadSuccess, currentPath = "", storage, setStorage }
           while (partIndex < urls.length) {
             const batch = urls.slice(partIndex, partIndex + MAX_CONCURRENT_PARTS);
             const results = await Promise.all(batch.map(async ({ partNumber, url }) => {
-              const start = (partNumber - 1) * PART_SIZE;
-              const end = Math.min(start + PART_SIZE, file.size);
-              const blob = file.slice(start, end);
-              const res = await fetch(url, { method: "PUT", body: blob });
+            const start = (partNumber - 1) * PART_SIZE;
+            const end = Math.min(start + PART_SIZE, file.size);
+            const blob = file.slice(start, end);
+            const res = await fetch(url, { method: "PUT", body: blob });
               if (!res.ok) throw new Error(`Upload failed for part ${partNumber}`);
               setProgress(Math.round(((partNumber) / numParts) * 100));
-              return { ETag: res.headers.get("ETag")?.replace(/"/g, ""), PartNumber: partNumber };
-            }));
+            return { ETag: res.headers.get("ETag")?.replace(/"/g, ""), PartNumber: partNumber };
+          }));
             etags.push(...results);
             partIndex += MAX_CONCURRENT_PARTS;
           }
@@ -139,7 +139,7 @@ const FileDropzone = ({ onUploadSuccess, currentPath = "", storage, setStorage }
     setProgress(0);
   };
 
-  return (
+      return (
     <div
       className={`w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-600 bg-[#18181b] rounded-xl text-gray-400 p-6 transition-all duration-300 ${uploading ? 'opacity-80' : isOverLimit ? 'opacity-60' : 'hover:border-emerald-400'}`}
       onDrop={handleDrop}
@@ -165,22 +165,22 @@ const FileDropzone = ({ onUploadSuccess, currentPath = "", storage, setStorage }
           </div>
         </div>
       ) : (
-        <div className="flex flex-col sm:flex-row items-stretch gap-4 w-full">
+      <div className="flex flex-col sm:flex-row items-stretch gap-4 w-full">
           <button type="button" onClick={handleClick} className="flex-1 p-4 bg-[#23232a] rounded-xl flex flex-col items-center justify-center hover:bg-[#333] transition-colors duration-200" disabled={isOverLimit}>
-            <svg className="w-8 h-8 mb-2 text-emerald-400" fill="none" viewBox="0 0 24 24"><path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            <span className="text-white font-semibold">Upload Files</span>
-            <span className="text-gray-400 text-sm">or drop files here</span>
-          </button>
-          <div className="sm:flex flex-col justify-center hidden"><div className="w-px h-16 bg-gray-700 mx-2" /></div>
+          <svg className="w-8 h-8 mb-2 text-emerald-400" fill="none" viewBox="0 0 24 24"><path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <span className="text-white font-semibold">Upload Files</span>
+          <span className="text-gray-400 text-sm">or drop files here</span>
+        </button>
+        <div className="sm:flex flex-col justify-center hidden"><div className="w-px h-16 bg-gray-700 mx-2" /></div>
           <button type="button" onClick={handleFolderClick} className="flex-1 p-4 bg-[#23232a] rounded-xl flex flex-col items-center justify-center hover:bg-[#333] transition-colors duration-200" disabled={isOverLimit}>
-            <svg className="w-8 h-8 mb-2 text-blue-400" fill="none" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            <span className="text-white font-semibold">Upload Folder</span>
-            <span className="text-gray-400 text-sm">preserves structure</span>
-          </button>
-        </div>
+          <svg className="w-8 h-8 mb-2 text-blue-400" fill="none" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <span className="text-white font-semibold">Upload Folder</span>
+          <span className="text-gray-400 text-sm">preserves structure</span>
+        </button>
+      </div>
       )}
     </div>
   );
 };
 
-export default FileDropzone; 
+export default FileDropzone;
