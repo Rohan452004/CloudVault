@@ -16,7 +16,7 @@ const { SelfManaged,
     deleteFolder,
     downloadFolderZip,
     getFolderZipShareUrl
-} = require('../controllers/S3Controller');
+} = require('../controllers/s3Controller');
 
 const multer = require("multer");
 

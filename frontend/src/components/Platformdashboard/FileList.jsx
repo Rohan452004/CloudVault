@@ -599,7 +599,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
                     <span className="text-gray-500 text-xs ml-2">{folderSizes[folder.key] !== undefined ? (folderSizes[folder.key] < 1024 ? `${folderSizes[folder.key]} B` : folderSizes[folder.key] < 1024 * 1024 ? `${(folderSizes[folder.key] / 1024).toFixed(1)} KB` : `${(folderSizes[folder.key] / (1024 * 1024)).toFixed(1)} MB`) : '...'}</span>
                   </div>
                 </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                <div className="flex gap-2 transition">
                   <button onClick={() => handleFolderAction('download', folder)} className="text-emerald-400 hover:text-emerald-300" title="Download as ZIP"><FaDownload /></button>
                   <button onClick={() => handleFolderAction('delete', folder)} className="text-red-500 hover:text-red-400" title="Delete Folder"><FaTrash /></button>
                   {renamingId !== (folder.id || folder.key) && (
@@ -663,7 +663,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
                     )}
                   </div>
                 </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                <div className="flex gap-2 transition">
                   <button onClick={() => handleAction('download', file)} className="text-emerald-400 hover:text-emerald-300" title="Download"><FaDownload /></button>
                   <button onClick={() => handleAction('delete', file)} className="text-red-500 hover:text-red-400" title="Delete"><FaTrash /></button>
                   {renamingId !== (file.id || file.key) && (
