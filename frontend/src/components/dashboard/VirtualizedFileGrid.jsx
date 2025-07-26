@@ -106,7 +106,7 @@ const VirtualizedFileGrid = ({
             {file.type === 'folder' ? (
               <>
                 <div className="flex flex-col items-center w-full" onClick={() => renamingId ? null : onFolderClick(file)}>
-                  <FaFolder className="w-12 h-12 text-emerald-400 mb-2" />
+                  <FaFolder className="w-12 h-12 text-emerald-400 mb-2 mt-6" />
                   {renamingId === (file.id || file.key) ? (
                     <div className="flex items-center gap-2 w-full">
                       <input
@@ -130,7 +130,7 @@ const VirtualizedFileGrid = ({
                   <span className="text-gray-500 text-xs mt-1">{folderSizes[file.key] !== undefined ? (folderSizes[file.key] < 1024 ? `${folderSizes[file.key]} B` : folderSizes[file.key] < 1024 * 1024 ? `${(folderSizes[file.key] / 1024).toFixed(1)} KB` : `${(folderSizes[file.key] / (1024 * 1024)).toFixed(1)} MB`) : '...'}</span>
                 </div>
                 {/* Folder actions overlay */}
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition z-10">
+                <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition z-10">
                   <button onClick={e => { e.stopPropagation(); onFolderAction('download', file); }} className="text-emerald-400 hover:text-emerald-300" title="Download as ZIP"><FaDownload /></button>
                   <button onClick={e => { e.stopPropagation(); onFolderAction('delete', file); }} className="text-red-500 hover:text-red-400" title="Delete Folder"><FaTrash /></button>
                   {renamingId !== (file.id || file.key) && (
@@ -142,7 +142,7 @@ const VirtualizedFileGrid = ({
             ) : (
               <>
                 {/* File thumbnail or icon logic */}
-                <div className="w-full flex flex-col items-center" onClick={() => renamingId ? null : onFileClick(file)}>
+                <div className="w-full flex flex-col items-center mt-4" onClick={() => renamingId ? null : onFileClick(file)}>
                   {getMimeType(file.name).startsWith('image/') || getMimeType(file.name).startsWith('video/') ? (
                     first20MediaKeys.has(file.key) && thumbUrls[file.key] ? (
                       getMimeType(file.name).startsWith('image/') ? (
@@ -185,7 +185,7 @@ const VirtualizedFileGrid = ({
                   )}
                 </div>
                 {/* Actions overlay for files */}
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition">
                   <button onClick={e => { e.stopPropagation(); onAction('download', file); }} className="text-emerald-400 hover:text-emerald-300" title="Download"><FaDownload /></button>
                   <button onClick={e => { e.stopPropagation(); onAction('delete', file); }} className="text-red-500 hover:text-red-400" title="Delete"><FaTrash /></button>
                   {renamingId !== (file.id || file.key) && (
