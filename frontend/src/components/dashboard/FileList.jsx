@@ -707,26 +707,26 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
     />
     <span className="text-gray-300">Select All</span>
     {selectedKeys.length > 0 && (
-      <>
+      <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2 sm:gap-0 sm:items-center mt-2 sm:mt-0 items-center">
         <button
           onClick={handleBulkDelete}
-          className="ml-4 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+          className="w-full sm:w-auto max-w-xs sm:max-w-none mx-auto sm:mx-0 ml-0 sm:ml-4 px-3 py-2 sm:py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
         >
           Delete Selected ({selectedKeys.length})
         </button>
         <button
           onClick={handleBulkDownload}
-          className="ml-2 px-3 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm"
+          className="w-full sm:w-auto max-w-xs sm:max-w-none mx-auto sm:mx-0 ml-0 sm:ml-2 px-3 py-2 sm:py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm"
         >
           Download Selected
         </button>
         <button
           onClick={handleBulkShare}
-          className="ml-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+          className="w-full sm:w-auto max-w-xs sm:max-w-none mx-auto sm:mx-0 ml-0 sm:ml-2 px-3 py-2 sm:py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
         >
           Share Selected
         </button>
-      </>
+      </div>
     )}
   </div>
 )}
@@ -738,8 +738,8 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
           <ul className="divide-y divide-[#23232a]">
             {/* Folders first */}
             {folders.map((folder, idx) => (
-              <li key={folder.id || `folder-${idx}`} className="flex items-center justify-between py-3 px-2 group hover:bg-[#23232a] rounded-lg transition">
-                <div className="flex items-center gap-3">
+              <li key={folder.id || `folder-${idx}`} className="flex flex-nowrap items-center justify-between py-3 px-2 group hover:bg-[#23232a] rounded-lg transition">
+                <div className="flex flex-nowrap items-center gap-2 sm:gap-3 min-w-0 w-full sm:w-auto">
                   <input
                     type="checkbox"
                     checked={selectedKeys.includes(folder.key)}
@@ -750,10 +750,10 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
                         setSelectedKeys(prev => prev.filter(k => k !== folder.key));
                       }
                     }}
-                    className="mr-2 accent-emerald-500"
+                    className="mr-1 accent-emerald-500"
                   />
-                  <FaFolder className="w-6 h-6 text-emerald-400" />
-                  <div className="flex flex-col">
+                  <FaFolder className="w-6 h-6 text-emerald-400 shrink-0" />
+                  <div className="flex flex-col min-w-0">
                     {renamingId === (folder.id || folder.key) ? (
                       <div className="flex items-center gap-2 w-full">
                         <input
@@ -772,12 +772,12 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
                         <button onClick={e => { e.stopPropagation(); cancelRename(); }} className="text-red-500 text-lg px-1" title="Cancel">✖</button>
                       </div>
                     ) : (
-                      <span className="text-gray-200 font-medium text-base cursor-pointer hover:underline" onClick={() => { if (!renamingId) handleFolderClick(folder); }}>{folder.name}</span>
+                      <span className="text-gray-200 font-medium text-base cursor-pointer hover:underline truncate max-w-[120px] sm:max-w-xs" onClick={() => { if (!renamingId) handleFolderClick(folder); }}>{folder.name}</span>
                     )}
-                    <span className="text-gray-500 text-xs ml-2">{folderSizes[folder.key] !== undefined ? (folderSizes[folder.key] < 1024 ? `${folderSizes[folder.key]} B` : folderSizes[folder.key] < 1024 * 1024 ? `${(folderSizes[folder.key] / 1024).toFixed(1)} KB` : `${(folderSizes[folder.key] / (1024 * 1024)).toFixed(1)} MB`) : '...'}</span>
+                    <span className="text-gray-500 text-xs ml-2 truncate max-w-[100px] sm:max-w-xs">{folderSizes[folder.key] !== undefined ? (folderSizes[folder.key] < 1024 ? `${folderSizes[folder.key]} B` : folderSizes[folder.key] < 1024 * 1024 ? `${(folderSizes[folder.key] / 1024).toFixed(1)} KB` : `${(folderSizes[folder.key] / (1024 * 1024)).toFixed(1)} MB`) : '...'}</span>
                   </div>
                 </div>
-                <div className="flex gap-2 transition">
+                <div className="flex flex-nowrap gap-1 sm:gap-2 ml-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition">
                   <button onClick={() => handleFolderAction('download', folder)} className="text-emerald-400 hover:text-emerald-300" title="Download as ZIP"><FaDownload /></button>
                   <button onClick={() => handleFolderAction('delete', folder)} className="text-red-500 hover:text-red-400" title="Delete Folder"><FaTrash /></button>
                   {renamingId !== (folder.id || folder.key) && (
@@ -789,8 +789,8 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
             ))}
             {/* Then files */}
             {regularFiles.map((file, idx) => (
-              <li key={file.id || `file-${idx}`} className="flex items-center justify-between py-3 px-2 group hover:bg-[#23232a] rounded-lg transition">
-                <div className="flex items-center gap-3">
+              <li key={file.id || `file-${idx}`} className="flex flex-nowrap items-center justify-between py-3 px-2 group hover:bg-[#23232a] rounded-lg transition">
+                <div className="flex flex-nowrap items-center gap-2 sm:gap-3 min-w-0 w-full sm:w-auto">
                   <input
                     type="checkbox"
                     checked={selectedKeys.includes(file.key)}
@@ -801,10 +801,10 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
                         setSelectedKeys(prev => prev.filter(k => k !== file.key));
                       }
                     }}
-                    className="mr-2 accent-emerald-500"
+                    className="mr-1 accent-emerald-500"
                   />
                   {getFileIcon(file.name)}
-                  <div className="flex flex-col">
+                  <div className="flex flex-col min-w-0">
                     {renamingId === (file.id || file.key) ? (
                       <div className="flex items-center gap-2 w-full">
                         <input
@@ -823,17 +823,10 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
                         <button onClick={e => { e.stopPropagation(); cancelRename(); }} className="text-red-500 text-lg px-1" title="Cancel">✖</button>
                       </div>
                     ) : (
-                      <span
-                        className="text-gray-200 font-medium text-base cursor-pointer hover:underline"
-                        onClick={() => {
-                          if (!renamingId) handleFileClick(file);
-                        }}
-                      >
-                        {file.name}
-                      </span>
+                      <span className="text-gray-200 font-medium text-base cursor-pointer hover:underline truncate max-w-[120px] sm:max-w-xs" onClick={() => { if (!renamingId) handleFileClick(file); }}>{file.name}</span>
                     )}
                     {file.size && (
-                      <span className="text-gray-500 text-sm">
+                      <span className="text-gray-500 text-sm truncate max-w-[100px] sm:max-w-xs">
                         {file.size < 1024 ? `${file.size} B` : 
                          file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(1)} KB` :
                          `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
@@ -841,7 +834,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
                     )}
                   </div>
                 </div>
-                <div className="flex gap-2 transition">
+                <div className="flex flex-nowrap gap-1 sm:gap-2 ml-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition">
                   <button onClick={() => handleAction('download', file)} className="text-emerald-400 hover:text-emerald-300" title="Download"><FaDownload /></button>
                   <button onClick={() => handleAction('delete', file)} className="text-red-500 hover:text-red-400" title="Delete"><FaTrash /></button>
                   {renamingId !== (file.id || file.key) && (
