@@ -83,6 +83,26 @@ const HowItWorksModal = ({ isOpen, onClose }) => {
         </div>
 
         <div className="p-6">
+          {/* Video Section */}
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">Watch How It Works</h3>
+            <div className="w-full max-w-2xl mx-auto">
+              <div className="aspect-video rounded-lg overflow-hidden bg-gray-900">
+                <iframe
+                  src="https://www.youtube.com/embed/AEaOjxcffCI"
+                  title="CloudVault Setup Guide"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  className="w-full h-full"
+                ></iframe>
+              </div>
+            </div>
+            <p className="text-sm text-gray-500 text-center mt-2">
+              Learn how to set up your AWS S3 bucket and connect it to CloudVault
+            </p>
+          </div>
+
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Why Choose Self-Managed S3?</h3>
             <p className="text-gray-600">
