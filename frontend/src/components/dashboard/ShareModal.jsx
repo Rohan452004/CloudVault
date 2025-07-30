@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axiosInstance from "../../utils/axiosInstance";
 import { useAws } from "../../contexts/AwsContext";
+import { toast } from "react-hot-toast";
 
 const COMMON_DURATIONS = [
   { label: "15 min", value: 15, unit: "minutes" },
@@ -25,6 +26,16 @@ const ShareModal = ({ open, file, onClose }) => {
   };
 
   const handleGenerate = async () => {
+    // Calculate total days for validation
+    let totalDays = duration;
+    if (unit === "hours") totalDays = duration / 24;
+    if (unit === "minutes") totalDays = duration / (24 * 60);
+    
+    if (totalDays > 7) {
+      toast.error("Maximum duration allowed is 7 days. Please select a shorter duration.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     setShareUrl("");
@@ -83,7 +94,7 @@ const ShareModal = ({ open, file, onClose }) => {
           <h2 className="text-xl font-bold text-white mb-4">Share Bulk Download ZIP</h2>
           <div className="mb-6">
             <div className="text-white font-semibold mb-2">Set Link Expiration</div>
-            <div className="text-gray-400 mb-2">Choose how long the share link should remain valid:</div>
+            <div className="text-gray-400 mb-2">Choose how long the share link should remain valid (max 7 days):</div>
             <div className="flex items-center gap-2 mb-4">
               <label className="text-gray-300">Duration:</label>
               <input
@@ -156,7 +167,7 @@ const ShareModal = ({ open, file, onClose }) => {
         {!file.isFolder && (
           <div className="mb-6">
             <div className="text-white font-semibold mb-2">Set Link Expiration</div>
-            <div className="text-gray-400 mb-2">Choose how long the share link should remain valid:</div>
+            <div className="text-gray-400 mb-2">Choose how long the share link should remain valid (max 7 days):</div>
             <div className="flex items-center gap-2 mb-4">
               <label className="text-gray-300">Duration:</label>
               <input
