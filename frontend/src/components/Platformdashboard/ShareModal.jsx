@@ -29,7 +29,8 @@ const ShareModal = ({ open, file, onClose }) => {
     }
   }, [open, file]);
 
-  if (!open || !file) return null;
+
+    if (!open || !file) return null;
 
   const handleCommon = (d) => {
     setDuration(d.value);
@@ -41,6 +42,17 @@ const ShareModal = ({ open, file, onClose }) => {
       setError("User not found. Please log in again.");
       return;
     }
+
+    // Calculate total days for validation
+    let totalDays = duration;
+    if (unit === "hours") totalDays = duration / 24;
+    if (unit === "minutes") totalDays = duration / (24 * 60);
+    
+    if (totalDays > 7) {
+      toast.error("Maximum duration allowed is 7 days. Please select a shorter duration.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     setShareUrl("");
@@ -54,7 +66,7 @@ const ShareModal = ({ open, file, onClose }) => {
       let res;
       if (file.isZip && file.keys) {
         // Case 1: Regenerate bulk share zip with new expiry
-        res = await axiosInstance.post(`platform/s3/${user._id}/bulk-share-zip`, {
+        res = await axiosInstance.post(`platform/s3/bulk/${user._id}/bulk-share-zip`, {
           keys: file.keys,
           expires: expiresInSeconds,
         });
@@ -93,7 +105,7 @@ const ShareModal = ({ open, file, onClose }) => {
         </h2>
         <div className="mb-6">
           <div className="text-white font-semibold mb-2">Set Link Expiration</div>
-          <div className="text-gray-400 mb-3 text-sm">Choose how long the link should be valid:</div>
+          <div className="text-gray-400 mb-3 text-sm">Choose how long the link should be valid (max 7 days):</div>
           <div className="flex items-center gap-2 mb-4">
             <input
               type="number"
