@@ -3,6 +3,7 @@ import { toast } from "react-hot-toast";
 import axiosInstance from "../../utils/axiosInstance";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { useGoogleLogin } from "@react-oauth/google";
 import { FaHome } from "react-icons/fa";
 
 const RegistrationPage = () => {
@@ -11,6 +12,7 @@ const RegistrationPage = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const { setUser } = useAuth();
   const navigate = useNavigate();
 
@@ -35,6 +37,28 @@ const RegistrationPage = () => {
       setIsLoading(false);
     }
   };
+
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setIsGoogleLoading(true);
+      try {
+        const response = await axiosInstance.post("/auth/googlelogin", {
+          token: tokenResponse.access_token,
+        });
+        toast.success("Google login successful!");
+        setUser(response.data.user);
+        navigate("/user/dashboard");
+      } catch (error) {
+        toast.error(error.response?.data?.message || "Google login failed!");
+      } finally {
+        setIsGoogleLoading(false);
+      }
+    },
+    onError: () => {
+      toast.error("Google login failed!");
+    },
+    flow: "implicit",
+  });
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 via-blue-50 to-blue-200 overflow-hidden">
@@ -91,6 +115,19 @@ const RegistrationPage = () => {
           disabled={isLoading}
         >
           {isLoading ? "Registering..." : "Register"}
+        </button>
+        <button
+          type="button"
+          onClick={() => googleLogin()}
+          className="bg-white border border-blue-400 text-blue-700 py-3 rounded-lg font-semibold hover:bg-blue-50 transition flex items-center justify-center gap-2"
+          disabled={isGoogleLoading}
+        >
+          {isGoogleLoading ? "Signing in..." : (
+            <>
+              <svg className="h-5 w-5" viewBox="0 0 48 48"><g><path fill="#4285F4" d="M24 9.5c3.54 0 6.7 1.22 9.19 3.22l6.85-6.85C35.64 2.36 30.21 0 24 0 14.82 0 6.73 5.48 2.69 13.44l7.98 6.2C12.13 13.13 17.62 9.5 24 9.5z"/><path fill="#34A853" d="M46.1 24.55c0-1.64-.15-3.22-.42-4.74H24v9.01h12.42c-.54 2.9-2.18 5.36-4.65 7.03l7.18 5.59C43.93 37.36 46.1 31.41 46.1 24.55z"/><path fill="#FBBC05" d="M9.67 28.09c-1.13-3.36-1.13-6.97 0-10.33l-7.98-6.2C-1.13 17.09-1.13 30.91 1.69 37.91l7.98-6.2z"/><path fill="#EA4335" d="M24 44c6.21 0 11.64-2.05 15.47-5.59l-7.18-5.59c-2.01 1.35-4.59 2.15-8.29 2.15-6.38 0-11.87-3.63-13.33-8.65l-7.98 6.2C6.73 42.52 14.82 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></g></svg>
+              <span>Sign in with Google</span>
+            </>
+          )}
         </button>
         <p className="text-center text-sm mt-2">
           Already have an account?{' '}
