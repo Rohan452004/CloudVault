@@ -127,8 +127,8 @@ const ShareModal = ({ open, file, onClose }) => {
     }
   };
 
-  // If this is a bulk zip with a provided url, just show the link and allow expiry regeneration
-  if (file.isZip && file.url) {
+  // If this is a bulk zip with keys but no URL, show the normal share interface
+  if (file.isZip && file.keys && !file.url) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
         <div className="bg-[#18181b] rounded-lg shadow-lg p-8 max-w-md w-full relative">
@@ -173,7 +173,7 @@ const ShareModal = ({ open, file, onClose }) => {
             className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 rounded-lg text-lg mb-4 disabled:opacity-60"
             disabled={loading}
           >
-            {loading ? "Generating..." : "Regenerate Share Link"}
+            {loading ? "Generating..." : "Generate Share Link"}
           </button>
           {error && <div className="text-red-400 mb-2 text-center">{error}</div>}
           {shareUrl && (

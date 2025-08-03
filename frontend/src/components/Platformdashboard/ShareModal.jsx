@@ -22,6 +22,7 @@ const ShareModal = ({ open, file, onClose }) => {
   // Reset state when the file prop changes (modal opens for a new file)
   useEffect(() => {
     if (open) {
+      // Only set shareUrl if there's an existing URL (not for bulk zip with keys only)
       setShareUrl(file?.isZip && file.url ? file.url : "");
       setShortUrl("");
       setError("");

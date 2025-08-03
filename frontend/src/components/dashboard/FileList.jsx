@@ -614,17 +614,13 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
         }
       }
 
-      // For multiple files/folders, request a zip share link from backend
-      const res = await axiosInstance.post('/self/s3/bulk/bulk-share-zip', {
-        accessKeyId: aws.accessKeyId,
-        secretAccessKey: aws.secretAccessKey,
-        bucket: aws.bucket,
-        region: aws.region,
-        keys: selectedKeys,
-        expires: 60 * 60, // 1 hour default
+      // For multiple files/folders, just pass the keys to ShareModal
+      // The ShareModal will generate the URL when the button is clicked
+      setShareFile({ 
+        name: 'CloudVault-Selected.zip', 
+        isZip: true, 
+        keys: selectedKeys 
       });
-      // Open share modal for the generated zip link
-      setShareFile({ name: 'CloudVault-Selected.zip', url: res.data.url, isZip: true, keys: selectedKeys });
       setShareModalOpen(true);
     } catch (err) {
       toast.error('Bulk share failed: ' + (err.response?.data?.message || err.message));
