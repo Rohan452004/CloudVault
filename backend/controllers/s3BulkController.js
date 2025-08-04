@@ -107,7 +107,7 @@ exports.bulkShareZip = async (req, res) => {
     }
     archive.finalize();
     // Upload the zip to S3
-    const zipKey = `shared-zips/CloudVault-Selected-${Date.now()}.zip`;
+    const zipKey = `shared-zips/CloudVault-${Date.now()}.zip`;
     await s3.upload({
       Bucket: bucket,
       Key: zipKey,

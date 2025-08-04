@@ -144,7 +144,7 @@ exports.bulkShareZip = async (req, res) => {
         }
         archive.finalize();
 
-        const zipKey = `users/${id}/shared-zips/Selection-${id}-${Date.now()}.zip`;
+        const zipKey = `users/${id}/shared-zips/CloudVault-${id}-${Date.now()}.zip`;
         await s3.upload({ Bucket: bucket, Key: zipKey, Body: pass }).promise();
         
         const url = s3.getSignedUrl('getObject', { Bucket: bucket, Key: zipKey, Expires: parseInt(expires) });
