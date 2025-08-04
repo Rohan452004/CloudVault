@@ -38,7 +38,7 @@ exports.createShortUrl = async (req, res) => {
     await shortUrl.save();
     
     // Return short URL using current domain
-    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    const baseUrl = process.env.BASE_URL || 'https://cloudvault-backend-l83q.onrender.com';
     const shortUrlString = `${baseUrl}/api/v1/short/${shortCode}`;
     
     return res.status(200).json({ 
