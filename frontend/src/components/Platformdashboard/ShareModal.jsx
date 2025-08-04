@@ -15,13 +15,16 @@ const ShareModal = ({ open, file, onClose }) => {
   const [duration, setDuration] = useState(15);
   const [unit, setUnit] = useState("minutes");
   const [shareUrl, setShareUrl] = useState("");
+  const [shortUrl, setShortUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   // Reset state when the file prop changes (modal opens for a new file)
   useEffect(() => {
     if (open) {
+      // Only set shareUrl if there's an existing URL (not for bulk zip with keys only)
       setShareUrl(file?.isZip && file.url ? file.url : "");
+      setShortUrl("");
       setError("");
       setLoading(false);
       setDuration(15);
@@ -29,12 +32,31 @@ const ShareModal = ({ open, file, onClose }) => {
     }
   }, [open, file]);
 
+  if (!open || !file) return null;
 
-    if (!open || !file) return null;
+  // Calculate total days for validation
+  const getTotalDays = (dur, u) => {
+    if (u === "minutes") return dur / (24 * 60);
+    if (u === "hours") return dur / 24;
+    if (u === "days") return dur;
+    return 0;
+  };
+
+  // Validate duration
+  const validateDuration = (dur, u) => {
+    const totalDays = getTotalDays(dur, u);
+    if (totalDays > 7) {
+      toast.error("Maximum duration allowed is 7 days. Please select a shorter duration.");
+      return false;
+    }
+    return true;
+  };
 
   const handleCommon = (d) => {
-    setDuration(d.value);
-    setUnit(d.unit);
+    if (validateDuration(d.value, d.unit)) {
+      setDuration(d.value);
+      setUnit(d.unit);
+    }
   };
 
   const handleGenerate = async () => {
@@ -43,19 +65,15 @@ const ShareModal = ({ open, file, onClose }) => {
       return;
     }
 
-    // Calculate total days for validation
-    let totalDays = duration;
-    if (unit === "hours") totalDays = duration / 24;
-    if (unit === "minutes") totalDays = duration / (24 * 60);
-    
-    if (totalDays > 7) {
-      toast.error("Maximum duration allowed is 7 days. Please select a shorter duration.");
+    // Validate duration before making the request
+    if (!validateDuration(duration, unit)) {
       return;
     }
 
     setLoading(true);
     setError("");
     setShareUrl("");
+    setShortUrl("");
 
     let expiresInMinutes = duration;
     if (unit === "hours") expiresInMinutes *= 60;
@@ -84,6 +102,19 @@ const ShareModal = ({ open, file, onClose }) => {
         });
       }
       setShareUrl(res.data.url);
+      
+      // Create short URL
+      try {
+        const shortRes = await axiosInstance.post("/short/create", {
+          originalUrl: res.data.url,
+          userId: user._id,
+          expiresIn: expiresInSeconds
+        });
+        setShortUrl(shortRes.data.shortUrl);
+      } catch (shortError) {
+        console.error("Failed to create short URL:", shortError);
+        // Don't show error to user, just use original URL
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Failed to generate share link");
     } finally {
@@ -147,21 +178,59 @@ const ShareModal = ({ open, file, onClose }) => {
         {shareUrl && (
           <div className="bg-[#23232a] p-4 rounded-lg">
             <label className="text-white text-sm font-semibold mb-2 block">Shareable Link:</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={shareUrl}
-                readOnly
-                className="w-full bg-black text-gray-300 border border-gray-700 rounded px-2 py-1"
-                onFocus={e => e.target.select()}
-              />
-              <button
-                onClick={copyToClipboard}
-                className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-1 rounded"
-              >
-                Copy
-              </button>
-            </div>
+            {shortUrl ? (
+              <>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={shortUrl}
+                    readOnly
+                    className="w-full bg-black text-gray-300 border border-gray-700 rounded px-2 py-1"
+                    onFocus={e => e.target.select()}
+                  />
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(shortUrl); toast.success("Short link copied!"); }}
+                    className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-1 rounded"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <details className="w-full">
+                  <summary className="text-gray-400 cursor-pointer text-xs mb-1">Show Original URL</summary>
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      type="text"
+                      value={shareUrl}
+                      readOnly
+                      className="w-full bg-black text-gray-300 border border-gray-700 rounded px-2 py-1 text-xs"
+                      onFocus={e => e.target.select()}
+                    />
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(shareUrl); toast.success("Original link copied!"); }}
+                      className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-1 rounded text-xs"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </details>
+              </>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={shareUrl}
+                  readOnly
+                  className="w-full bg-black text-gray-300 border border-gray-700 rounded px-2 py-1"
+                  onFocus={e => e.target.select()}
+                />
+                <button
+                  onClick={() => { navigator.clipboard.writeText(shareUrl); toast.success("Link copied!"); }}
+                  className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-1 rounded"
+                >
+                  Copy
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

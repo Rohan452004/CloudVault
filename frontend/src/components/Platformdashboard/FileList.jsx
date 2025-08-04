@@ -446,8 +446,13 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
     if (!user?._id || selectedKeys.length === 0) return;
     setOperationLoading(true);
     try {
-      const res = await axiosInstance.post(`platform/s3/bulk/${user._id}/bulk-share-zip`, { keys: selectedKeys, expires: 3600 });
-      setShareFile({ name: 'CloudVault-Selected.zip', url: res.data.url, isZip: true, keys: selectedKeys });
+      // Just pass the keys to ShareModal
+      // The ShareModal will generate the URL when the button is clicked
+      setShareFile({ 
+        name: 'CloudVault-Selected.zip', 
+        isZip: true, 
+        keys: selectedKeys 
+      });
       setShareModalOpen(true);
     } catch (err) {
       toast.error('Bulk share failed: ' + (err.response?.data?.message || err.message));
