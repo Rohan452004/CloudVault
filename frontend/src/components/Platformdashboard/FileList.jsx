@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useAws } from "../../contexts/AwsContext";
+import { useAuth } from "../../contexts/AuthContext";
 import axiosInstance from "../../utils/axiosInstance";
-import FilePreviewModal from "./FilePreviewModal";
-import ShareModal from "./ShareModal";
-import VirtualizedFileGrid from "./VirtualizedFileGrid";
+import FilePreviewModal from "../Platformdashboard/FilePreviewModal";
+import ShareModal from "../Platformdashboard/ShareModal";
+import VirtualizedFileGrid from "../Platformdashboard/VirtualizedFileGrid";
 import { toast } from "react-hot-toast";
 import { FaFilePdf, FaFileWord, FaFileExcel, FaFileArchive, FaFileAlt, FaFileImage, FaFileVideo, FaFileAudio, FaFileCode, FaFile, FaEdit, FaTrash, FaDownload, FaFolder, FaShareAlt } from "react-icons/fa";
 
@@ -41,7 +41,7 @@ const getFileIcon = (fileName) => {
 };
 
 const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPath = '', onPathChange, refreshKey = 0, search = '', filterType = 'all', viewMode = 'list', onFileChange }) => {
-  const { aws } = useAws();
+  const { user } = useAuth();
   const [s3Files, setS3Files] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -55,7 +55,6 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   const [shareFolderModal, setShareFolderModal] = useState({ open: false, folder: null });
   const [operationLoading, setOperationLoading] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState([]);
-  
   // Cache for list requests
   const [listCache, setListCache] = useState({});
   const [cacheTimestamp, setCacheTimestamp] = useState({});
@@ -63,20 +62,17 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   // Cache invalidation function
   const invalidateCache = (path = null) => {
     if (path) {
-      // Invalidate specific path cache
-      const cacheKey = `${aws.bucket}-${path}`;
       setListCache(prev => {
         const newCache = { ...prev };
-        delete newCache[cacheKey];
+        delete newCache[path];
         return newCache;
       });
       setCacheTimestamp(prev => {
         const newTimestamps = { ...prev };
-        delete newTimestamps[cacheKey];
+        delete newTimestamps[path];
         return newTimestamps;
       });
     } else {
-      // Invalidate all cache
       setListCache({});
       setCacheTimestamp({});
     }
@@ -84,52 +80,36 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
 
   // Update cache when files are modified
   const updateCache = (path, files) => {
-    const cacheKey = `${aws.bucket}-${path}`;
-    setListCache(prev => ({ ...prev, [cacheKey]: files }));
-    setCacheTimestamp(prev => ({ ...prev, [cacheKey]: Date.now() }));
+    setListCache(prev => ({ ...prev, [path]: files }));
+    setCacheTimestamp(prev => ({ ...prev, [path]: Date.now() }));
   };
 
-  // Fetch files from S3 when component mounts, AWS credentials, path, or refreshKey changes
   useEffect(() => {
-    if (aws.accessKeyId && aws.secretAccessKey && aws.bucket && aws.region) {
+    if (user?._id) {
       fetchS3Files();
     }
-  }, [aws, currentPath, refreshKey]);
+    // eslint-disable-next-line
+  }, [user?._id, currentPath, refreshKey]);
 
   const fetchS3Files = async () => {
     setLoading(true);
     setError(null);
-    
-    // Check cache first
-    const cacheKey = `${aws.bucket}-${currentPath}`;
+    const cacheKey = currentPath;
     const now = Date.now();
     const cacheAge = now - (cacheTimestamp[cacheKey] || 0);
     const cacheValid = cacheAge < 5 * 60 * 1000; // 5 minutes cache
-    
     if (listCache[cacheKey] && cacheValid && refreshKey === 0) {
-      // Use cached data if available and fresh
       setS3Files(listCache[cacheKey]);
       setLoading(false);
       return;
     }
-    
     try {
-      const response = await axiosInstance.post('/self/s3/list-files', {
-        accessKeyId: aws.accessKeyId,
-        secretAccessKey: aws.secretAccessKey,
-        bucket: aws.bucket,
-        region: aws.region,
-        prefix: currentPath
-      });
-
+      const response = await axiosInstance.post(`platform/s3/${user._id}/list-files`, { prefix: currentPath });
       const files = response.data.files;
       setS3Files(files);
-      
-      // Cache the result
       setListCache(prev => ({ ...prev, [cacheKey]: files }));
       setCacheTimestamp(prev => ({ ...prev, [cacheKey]: now }));
     } catch (err) {
-      console.error('Error fetching S3 files:', err);
       setError(err.response?.data?.message || 'Failed to fetch files from S3');
       setS3Files([]);
     } finally {
@@ -144,20 +124,12 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   };
 
   const handleFileClick = async (file) => {
-    // Fetch signed URL for preview
     try {
-      const res = await axiosInstance.post('/self/s3/get-signed-url', {
-        accessKeyId: aws.accessKeyId,
-        secretAccessKey: aws.secretAccessKey,
-        bucket: aws.bucket,
-        region: aws.region,
-        key: file.key,
-      });
+      const res = await axiosInstance.post(`platform/s3/${user._id}/get-signed-url`, { key: file.key });
       setPreview({ open: true, url: res.data.url, type: getMimeType(file.name), name: file.name });
     } catch (err) {
       toast.error('Failed to get file preview URL');
     }
-    // Removed: onFileClick?.(file);
   };
 
   const handleAction = async (action, file) => {
@@ -165,17 +137,10 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       if (!window.confirm(`Are you sure you want to delete '${file.name}'? This cannot be undone.`)) return;
       setOperationLoading(true);
       try {
-        await axiosInstance.post('/self/s3/delete', {
-          accessKeyId: aws.accessKeyId,
-          secretAccessKey: aws.secretAccessKey,
-          bucket: aws.bucket,
-          region: aws.region,
-          key: file.key,
-        });
-        // Update state directly instead of forcing refresh
+        await axiosInstance.post(`platform/s3/${user._id}/delete`, { key: file.key });
         const updatedFiles = s3Files.filter(f => f.key !== file.key);
         setS3Files(updatedFiles);
-        updateCache(currentPath, updatedFiles); // Update cache with new state
+        updateCache(currentPath, updatedFiles);
         toast.success('File deleted successfully');
         onFileChange?.();
       } catch (err) {
@@ -186,14 +151,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
     } else if (action === 'download') {
       setOperationLoading(true);
       try {
-        const res = await axiosInstance.post('/self/s3/get-signed-url', {
-          accessKeyId: aws.accessKeyId,
-          secretAccessKey: aws.secretAccessKey,
-          bucket: aws.bucket,
-          region: aws.region,
-          key: file.key,
-        });
-        // Fetch the file as a blob
+        const res = await axiosInstance.post(`platform/s3/${user._id}/get-signed-url`, { key: file.key });
         const fileRes = await fetch(res.data.url);
         const blob = await fileRes.blob();
         const url = window.URL.createObjectURL(blob);
@@ -220,7 +178,6 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
     if (!newName || newName === file.name) return;
     let newKey;
     if (file.type === 'folder') {
-      // Remove trailing slash, rename, add slash back
       const parent = file.key.slice(0, file.key.lastIndexOf(file.name));
       newKey = parent + newName + '/';
     } else {
@@ -229,18 +186,11 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
     }
     setOperationLoading(true);
     try {
-      await axiosInstance.post('/self/s3/rename', {
-        accessKeyId: aws.accessKeyId,
-        secretAccessKey: aws.secretAccessKey,
-        bucket: aws.bucket,
-        region: aws.region,
-        oldKey: file.key,
-        newKey,
-      });
-      setS3Files([]); // force refresh
+      await axiosInstance.post(`platform/s3/${user._id}/rename`, { oldKey: file.key, newKey });
+      setS3Files([]);
       fetchS3Files();
       onFileChange?.();
-      invalidateCache(currentPath); // Invalidate cache for the current path
+      invalidateCache(currentPath);
     } catch (err) {
       toast.error('Failed to rename: ' + (err.response?.data?.message || err.message));
     } finally {
@@ -268,25 +218,13 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       const newPrefix = parent + renameValue + '/';
       setOperationLoading(true);
       try {
-        await axiosInstance.post('/self/s3/rename-folder', {
-          accessKeyId: aws.accessKeyId,
-          secretAccessKey: aws.secretAccessKey,
-          bucket: aws.bucket,
-          region: aws.region,
-          oldPrefix: file.key,
-          newPrefix,
-        });
+        await axiosInstance.post(`platform/s3/${user._id}/rename-folder`, { oldPrefix: file.key, newPrefix });
         toast.success('Folder renamed successfully');
         setRenamingId(null);
         setRenameValue("");
-        // Update state directly instead of forcing refresh
-        const updatedFiles = s3Files.map(f => 
-          f.key === file.key 
-            ? { ...f, name: renameValue, key: newPrefix }
-            : f
-        );
+        const updatedFiles = s3Files.map(f => f.key === file.key ? { ...f, name: renameValue, key: newPrefix } : f);
         setS3Files(updatedFiles);
-        updateCache(currentPath, updatedFiles); // Update cache with new state
+        updateCache(currentPath, updatedFiles);
         onFileChange?.();
       } catch (err) {
         toast.error('Failed to rename folder: ' + (err.response?.data?.message || err.message));
@@ -300,25 +238,13 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       newKey = parent + renameValue;
       setOperationLoading(true);
       try {
-        await axiosInstance.post('/self/s3/rename', {
-          accessKeyId: aws.accessKeyId,
-          secretAccessKey: aws.secretAccessKey,
-          bucket: aws.bucket,
-          region: aws.region,
-          oldKey: file.key,
-          newKey,
-        });
+        await axiosInstance.post(`platform/s3/${user._id}/rename`, { oldKey: file.key, newKey });
         toast.success('File renamed successfully');
         setRenamingId(null);
         setRenameValue("");
-        // Update state directly instead of forcing refresh
-        const updatedFiles = s3Files.map(f => 
-          f.key === file.key 
-            ? { ...f, name: renameValue, key: newKey }
-            : f
-        );
+        const updatedFiles = s3Files.map(f => f.key === file.key ? { ...f, name: renameValue, key: newKey } : f);
         setS3Files(updatedFiles);
-        updateCache(currentPath, updatedFiles); // Update cache with new state
+        updateCache(currentPath, updatedFiles);
         onFileChange?.();
       } catch (err) {
         toast.error('Failed to rename: ' + (err.response?.data?.message || err.message));
@@ -340,18 +266,11 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       setFolderActionLoading(true);
       setOperationLoading(true);
       try {
-        await axiosInstance.post('/self/s3/delete-folder', {
-          accessKeyId: aws.accessKeyId,
-          secretAccessKey: aws.secretAccessKey,
-          bucket: aws.bucket,
-          region: aws.region,
-          prefix: folder.key,
-        });
+        await axiosInstance.post(`platform/s3/${user._id}/delete-folder`, { prefix: folder.key });
         toast.success('Folder deleted successfully');
-        // Update state directly instead of forcing refresh
         const updatedFiles = s3Files.filter(f => f.key !== folder.key);
         setS3Files(updatedFiles);
-        updateCache(currentPath, updatedFiles); // Update cache with new state
+        updateCache(currentPath, updatedFiles);
         onFileChange?.();
       } catch (err) {
         toast.error('Failed to delete folder: ' + (err.response?.data?.message || err.message));
@@ -367,23 +286,11 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       setFolderActionLoading(true);
       setOperationLoading(true);
       try {
-        await axiosInstance.post('/self/s3/rename-folder', {
-          accessKeyId: aws.accessKeyId,
-          secretAccessKey: aws.secretAccessKey,
-          bucket: aws.bucket,
-          region: aws.region,
-          oldPrefix: folder.key,
-          newPrefix,
-        });
+        await axiosInstance.post(`platform/s3/${user._id}/rename-folder`, { oldPrefix: folder.key, newPrefix });
         toast.success('Folder renamed successfully');
-        // Update state directly instead of forcing refresh
-        const updatedFiles = s3Files.map(f => 
-          f.key === folder.key 
-            ? { ...f, name: newName, key: newPrefix }
-            : f
-        );
+        const updatedFiles = s3Files.map(f => f.key === folder.key ? { ...f, name: newName, key: newPrefix } : f);
         setS3Files(updatedFiles);
-        updateCache(currentPath, updatedFiles); // Update cache with new state
+        updateCache(currentPath, updatedFiles);
         onFileChange?.();
       } catch (err) {
         toast.error('Failed to rename folder: ' + (err.response?.data?.message || err.message));
@@ -395,13 +302,7 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       setFolderActionLoading(true);
       setOperationLoading(true);
       try {
-        const res = await axiosInstance.post('/self/s3/download-folder-zip', {
-          accessKeyId: aws.accessKeyId,
-          secretAccessKey: aws.secretAccessKey,
-          bucket: aws.bucket,
-          region: aws.region,
-          prefix: folder.key,
-        }, { responseType: 'blob' });
+        const res = await axiosInstance.post(`platform/s3/${user._id}/download-folder-zip`, { prefix: folder.key }, { responseType: 'blob' });
         const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/zip' }));
         const link = document.createElement('a');
         link.href = url;
@@ -427,18 +328,10 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
 
   // Recursive folder size calculation with caching
   const fetchFolderSize = useCallback(async (prefix) => {
-    // Check if we already have this folder's size cached
     if (folderSizes[prefix] !== undefined) {
       return folderSizes[prefix];
     }
-    
-    const res = await axiosInstance.post('/self/s3/list-files', {
-      accessKeyId: aws.accessKeyId,
-      secretAccessKey: aws.secretAccessKey,
-      bucket: aws.bucket,
-      region: aws.region,
-      prefix
-    });
+    const res = await axiosInstance.post(`platform/s3/${user._id}/list-files`, { prefix });
     let totalSize = 0;
     const files = res.data.files || [];
     for (const f of files) {
@@ -448,38 +341,28 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       }
     }
     return totalSize;
-  }, [aws, folderSizes]);
+  }, [user, folderSizes]);
 
   useEffect(() => {
     const fetchAllFolderSizes = async () => {
       const folders = s3Files.filter(f => f.type === 'folder');
       const newSizes = {};
-      
-      // Only fetch sizes for folders we don't already have
       for (const folder of folders) {
         if (folderSizes[folder.key] === undefined) {
           newSizes[folder.key] = await fetchFolderSize(folder.key);
         }
       }
-      
-      // Update state only if we have new sizes
       if (Object.keys(newSizes).length > 0) {
         setFolderSizes(prev => ({ ...prev, ...newSizes }));
       }
     };
-    
     if (s3Files.length > 0) fetchAllFolderSizes();
   }, [s3Files, fetchFolderSize, folderSizes]);
 
-  // Use S3 files if AWS credentials are available, otherwise use passed files prop
-  let displayFiles = aws.accessKeyId ? s3Files : files;
-
-  // Filter by search
+  let displayFiles = s3Files;
   if (search) {
     displayFiles = displayFiles.filter(f => f.name.toLowerCase().includes(search.toLowerCase()));
   }
-
-  // Filter by filterType
   if (filterType === 'files') {
     displayFiles = displayFiles.filter(f => f.type === 'file');
   } else if (filterType === 'folders') {
@@ -489,7 +372,6 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   } else if (filterType === 'videos') {
     displayFiles = displayFiles.filter(f => getMimeType(f.name).startsWith('video/'));
   }
-
   const folders = displayFiles.filter(f => f.type === 'folder');
   const regularFiles = displayFiles.filter(f => f.type === 'file');
 
@@ -500,7 +382,6 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
       </div>
     );
   }
-
   if (error) {
     return (
       <div className="w-full bg-[#18181b] rounded-b-2xl shadow-lg p-4 mt-2 min-h-[120px] flex items-center justify-center">
@@ -518,17 +399,13 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
     );
   }
 
+  // Bulk actions for platform
   const handleBulkDelete = async () => {
+    if (!user?._id || selectedKeys.length === 0) return;
     if (!window.confirm(`Delete ${selectedKeys.length} selected item(s)? This cannot be undone.`)) return;
     setOperationLoading(true);
     try {
-      await axiosInstance.post('/self/s3/bulk/bulk-delete', {
-        accessKeyId: aws.accessKeyId,
-        secretAccessKey: aws.secretAccessKey,
-        bucket: aws.bucket,
-        region: aws.region,
-        keys: selectedKeys,
-      });
+      await axiosInstance.post(`platform/s3/bulk/${user._id}/bulk-delete`, { keys: selectedKeys });
       const updatedFiles = s3Files.filter(f => !selectedKeys.includes(f.key));
       setS3Files(updatedFiles);
       setSelectedKeys([]);
@@ -543,43 +420,10 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   };
 
   const handleBulkDownload = async () => {
+    if (!user?._id || selectedKeys.length === 0) return;
     setOperationLoading(true);
     try {
-      if (selectedKeys.length === 0) return;
-      // If only one folder, use existing folder zip logic
-      if (selectedKeys.length === 1) {
-        const item = s3Files.find(f => f.key === selectedKeys[0]);
-        if (item && item.type === 'folder') {
-          const res = await axiosInstance.post('/self/s3/download-folder-zip', {
-            accessKeyId: aws.accessKeyId,
-            secretAccessKey: aws.secretAccessKey,
-            bucket: aws.bucket,
-            region: aws.region,
-            prefix: item.key,
-          }, { responseType: 'blob' });
-          const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/zip' }));
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `${item.name}.zip`;
-          document.body.appendChild(link);
-          link.click();
-          setTimeout(() => {
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(link);
-          }, 100);
-          toast.success('Folder downloaded as ZIP.');
-          setOperationLoading(false);
-          return;
-        }
-      }
-      // For multiple files/folders, request a zip from backend
-      const res = await axiosInstance.post('/self/s3/bulk/bulk-download-zip', {
-        accessKeyId: aws.accessKeyId,
-        secretAccessKey: aws.secretAccessKey,
-        bucket: aws.bucket,
-        region: aws.region,
-        keys: selectedKeys,
-      }, { responseType: 'blob' });
+      const res = await axiosInstance.post(`platform/s3/bulk/${user._id}/bulk-download-zip`, { keys: selectedKeys }, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/zip' }));
       const link = document.createElement('a');
       link.href = url;
@@ -599,22 +443,10 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   };
 
   const handleBulkShare = async () => {
+    if (!user?._id || selectedKeys.length === 0) return;
     setOperationLoading(true);
     try {
-      if (selectedKeys.length === 0) return;
-      // If only one folder, use existing folder share logic
-      if (selectedKeys.length === 1) {
-        const item = s3Files.find(f => f.key === selectedKeys[0]);
-        if (item && item.type === 'folder') {
-          // Open share modal for folder zip
-          setShareFile({ ...item, isFolder: true });
-          setShareModalOpen(true);
-          setOperationLoading(false);
-          return;
-        }
-      }
-
-      // For multiple files/folders, just pass the keys to ShareModal
+      // Just pass the keys to ShareModal
       // The ShareModal will generate the URL when the button is clicked
       setShareFile({ 
         name: 'CloudVault-Selected.zip', 
@@ -631,12 +463,12 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
 
   // Modular grid view
   if (viewMode === 'grid') {
-    // Always use virtualized grid for all collections
     return (
       <>
         <div className="w-full bg-[#18181b] rounded-b-2xl shadow-lg p-4 mt-2 min-h-[120px]">
           <VirtualizedFileGrid
             files={[...folders, ...regularFiles]}
+            user={user}
             onFileClick={handleFileClick}
             onFolderClick={handleFolderClick}
             onAction={handleAction}
@@ -647,7 +479,6 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
             saveRename={saveRename}
             cancelRename={cancelRename}
             handleShare={handleShare}
-            aws={aws}
             onFolderAction={handleFolderAction}
             folderSizes={folderSizes}
           />
@@ -670,16 +501,16 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
           onClose={() => setShareFolderModal({ open: false, folder: null })}
         />
         {operationLoading && (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
-    <div className="flex flex-col items-center gap-4">
-      <svg className="animate-spin w-12 h-12 text-emerald-400" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-      </svg>
-      <span className="text-white text-lg font-semibold">Please wait...</span>
-    </div>
-  </div>
-)}
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-4">
+              <svg className="animate-spin w-12 h-12 text-emerald-400" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+              </svg>
+              <span className="text-white text-lg font-semibold">Please wait...</span>
+            </div>
+          </div>
+        )}
       </>
     );
   }
@@ -687,48 +518,48 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
   return (
     <>
       <div className="w-full bg-[#18181b] rounded-b-2xl shadow-lg p-4 mt-2 min-h-[120px]">
-        {viewMode !== 'grid' && (folders.length > 0 || regularFiles.length > 0) && (
-  <div className="flex items-center mb-2">
-    <input
-      type="checkbox"
-      checked={selectedKeys.length === (folders.length + regularFiles.length) && selectedKeys.length > 0}
-      onChange={e => {
-        if (e.target.checked) {
-          setSelectedKeys([...folders, ...regularFiles].map(f => f.key));
-        } else {
-          setSelectedKeys([]);
-        }
-      }}
-      className="mr-2 accent-emerald-500"
-    />
-    <span className="text-gray-300">Select All</span>
-    {selectedKeys.length > 0 && (
-      <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2 sm:gap-0 sm:items-center mt-2 sm:mt-0 items-center">
-        <button
-          onClick={handleBulkDelete}
-          className="w-full sm:w-auto max-w-xs sm:max-w-none mx-auto sm:mx-0 ml-0 sm:ml-4 px-3 py-2 sm:py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-        >
-          Delete Selected ({selectedKeys.length})
-        </button>
-        <button
-          onClick={handleBulkDownload}
-          className="w-full sm:w-auto max-w-xs sm:max-w-none mx-auto sm:mx-0 ml-0 sm:ml-2 px-3 py-2 sm:py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm"
-        >
-          Download Selected
-        </button>
-        <button
-          onClick={handleBulkShare}
-          className="w-full sm:w-auto max-w-xs sm:max-w-none mx-auto sm:mx-0 ml-0 sm:ml-2 px-3 py-2 sm:py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-        >
-          Share Selected
-        </button>
-      </div>
-    )}
-  </div>
-)}
+        {(folders.length > 0 || regularFiles.length > 0) && (
+          <div className="flex items-center mb-2">
+            <input
+              type="checkbox"
+              checked={selectedKeys.length === (folders.length + regularFiles.length) && selectedKeys.length > 0}
+              onChange={e => {
+                if (e.target.checked) {
+                  setSelectedKeys([...folders, ...regularFiles].map(f => f.key));
+                } else {
+                  setSelectedKeys([]);
+                }
+              }}
+              className="mr-2 accent-emerald-500"
+            />
+            <span className="text-gray-300">Select All</span>
+            {selectedKeys.length > 0 && (
+              <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2 sm:gap-0 sm:items-center mt-2 sm:mt-0 items-center">
+                <button
+                  onClick={handleBulkDelete}
+                  className="w-full sm:w-auto max-w-xs sm:max-w-none mx-auto sm:mx-0 ml-0 sm:ml-4 px-3 py-2 sm:py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                >
+                  Delete Selected ({selectedKeys.length})
+                </button>
+                <button
+                  onClick={handleBulkDownload}
+                  className="w-full sm:w-auto max-w-xs sm:max-w-none mx-auto sm:mx-0 ml-0 sm:ml-2 px-3 py-2 sm:py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm"
+                >
+                  Download Selected
+                </button>
+                <button
+                  onClick={handleBulkShare}
+                  className="w-full sm:w-auto max-w-xs sm:max-w-none mx-auto sm:mx-0 ml-0 sm:ml-2 px-3 py-2 sm:py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                >
+                  Share Selected
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {folders.length === 0 && regularFiles.length === 0 ? (
           <div className="text-gray-500 text-center py-8">
-            {aws.accessKeyId ? 'No files or folders found in S3 bucket.' : 'No files or folders found.'}
+            No files or folders found.
           </div>
         ) : (
           <ul className="divide-y divide-[#23232a]">
@@ -861,18 +692,18 @@ const FileList = ({ files = [], onFileClick, onFolderClick, onAction, currentPat
         onClose={() => setShareFolderModal({ open: false, folder: null })}
       />
       {operationLoading && (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
-    <div className="flex flex-col items-center gap-4">
-      <svg className="animate-spin w-12 h-12 text-emerald-400" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-      </svg>
-      <span className="text-white text-lg font-semibold">Please wait...</span>
-    </div>
-  </div>
-)}
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4">
+            <svg className="animate-spin w-12 h-12 text-emerald-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+            <span className="text-white text-lg font-semibold">Please wait...</span>
+          </div>
+        </div>
+      )}
     </>
   );
 };
 
-export default FileList; 
+export default FileList;

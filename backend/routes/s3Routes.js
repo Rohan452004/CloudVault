@@ -11,8 +11,12 @@ const { SelfManaged,
     initiateMultipartUpload,
     getMultipartUploadUrls,
     completeMultipartUpload,
-    abortMultipartUpload
-} = require('../controllers/S3Controller');
+    abortMultipartUpload,
+    renameFolder,
+    deleteFolder,
+    downloadFolderZip,
+    getFolderZipShareUrl
+} = require('../controllers/s3Controller');
 
 const multer = require("multer");
 
@@ -31,5 +35,9 @@ router.post("/initiate-multipart-upload", initiateMultipartUpload);
 router.post("/get-multipart-upload-urls", getMultipartUploadUrls);
 router.post("/complete-multipart-upload", completeMultipartUpload);
 router.post("/abort-multipart-upload", abortMultipartUpload);
+router.post("/rename-folder", renameFolder);
+router.post("/delete-folder", deleteFolder);
+router.post("/download-folder-zip", downloadFolderZip);
+router.post("/get-folder-zip-share-url", getFolderZipShareUrl);
 
 module.exports = router;
