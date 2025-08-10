@@ -63,15 +63,18 @@ const PlatformDashboard = () => {
     };
     const fetchUsage = async () => {
       try {
-        const totalSize = await fetchAllFiles("");
-        setStorage(s => ({ ...s, used: totalSize }));
+        // Only fetch usage if we don't have it cached or if refreshKey changed
+        if (storage.used === 0 || refreshKey > 0) {
+          const totalSize = await fetchAllFiles("");
+          setStorage(s => ({ ...s, used: totalSize }));
+        }
       } catch (err) {
         toast.error('Failed to fetch storage usage');
       }
     };
     
     fetchUsage();
-  }, [user, refreshKey]);
+  }, [user, refreshKey, storage.used]);
 
   const handleLogout = () => {
     logout();
