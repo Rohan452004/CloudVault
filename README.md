@@ -3,6 +3,10 @@
 
 A powerful and easy-to-use cloud storage platform built on **AWS S3**!
 
+<img width="832" height="454" alt="Screenshot 2025-08-27 at 5 59 16 PM" src="https://github.com/user-attachments/assets/92017d42-2a25-4b6b-a8e0-408d2c879f3a" />
+
+
+
 ## 🔧 Choose between:
 
 ✅ **Self-Managed Mode** — Connect your own S3 bucket (ideal for devs & startups)  
