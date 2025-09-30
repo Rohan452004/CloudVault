@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongodb-pv
+  namespace: cloudvault-app
+spec:
+  capacity:
+    storage: 5Gi         # total size of storage
+  accessModes:
+    - ReadWriteOnce      # only one node can mount it at a time
+  hostPath:              # for Minikube / local cluster
+    path: /data/mongo    # directory on the worker node
+
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  namespace: cloudvault-app
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi       # how much storage this claim wants

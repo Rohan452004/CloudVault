@@ -22,3 +22,29 @@ spec :
         image : mongo:latest
         ports :
         - containerPort : 27017
+
+        env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: mongo-username
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: mongo-password
+            - name: MONGO_INITDB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: mongo-db
+                  
+        volumeMounts : 
+        - name : mongo-data
+          mountPath : /data/db    #path inside the container where volume is mounted
+      volumes : 
+        - name : mongo-data
+          persistentVolumeClaim :
+            claimName : mongodb-pvc   #claim created in mongodb-pv.yml
+          
