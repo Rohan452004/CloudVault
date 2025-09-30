@@ -1,0 +1,24 @@
+apiVersion : apps/v1
+kind : Deployment
+metadata : 
+  name : frontend-deployment
+  namespace : cloudvault-app
+
+spec :
+  replicas : 1
+  selector : 
+    matchLabels : 
+      app : frontend
+
+  template :       #pod template
+    metadata : 
+      labels : 
+        app : frontend
+      name : frontend-pod
+      namespace : cloudvault-app
+    spec : 
+      containers :
+      - name : frontend-container 
+        image : rohanwagh515/cloudvault:frontend-latest
+        ports :
+        - containerPort : 80

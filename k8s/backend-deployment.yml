@@ -1,0 +1,48 @@
+apiVersion : apps/v1
+kind : Deployment
+metadata : 
+  name : backend-deployment
+  namespace : cloudvault-app
+
+spec :
+  replicas : 1
+  selector : 
+    matchLabels : 
+      app : backend
+
+  template :       #pod template
+    metadata : 
+      labels : 
+        app : backend
+      name : backend-pod
+      namespace : cloudvault-app
+    spec : 
+      containers :
+      - name : backend-container 
+        image : rohanwagh515/cloudvault:backend-latest
+        ports :
+        - containerPort : 5000
+        env :
+        - name : PLATFORM_S3_REGION
+          valueFrom :
+            configMapKeyRef:
+              name : backend-config
+              key : PLATFORM_S3_REGION
+          
+        - name : PLATFORM_S3_BUCKET
+          valueFrom :
+            configMapKeyRef:
+              name : backend-config
+              key : PLATFORM_S3_BUCKET_NAME
+
+        - name : PLATFORM_S3_KEY
+          valueFrom :
+            secretKeyRef:
+              name : backend-secrets
+              key : PLATFORM_S3_KEY  
+
+        - name : PLATFORM_S3_SECRET
+          valueFrom :
+            secretKeyRef:
+              name : backend-secrets
+              key : PLATFORM_S3_SECRET
