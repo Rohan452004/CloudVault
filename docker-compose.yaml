@@ -1,21 +1,52 @@
+version: "3.8"
+
+# section defines all the containers you want to run for your application.
+# Here you have 3 services: backend, frontend, and mongo
+
 services:
-  backend:
-    container_name: backend
-    build: ./backend
+  backend:       #service-1 
+    build: ./backend    # Builds a Docker image using the Dockerfile inside the ./backend folder.
     env_file:
-      - ./backend/.env
+      - backend/.env   #Loads environment variables from the .env file in the backend folder (at runtime).
+    container_name: mern-backend
     ports:
-      - "3000:3000"
-    restart: unless-stopped
+      - "5000:5000"     #host:container
+    environment:                  #Sets environment variables inside the container.
+      - MONGO_URL=mongodb://mongo:27017/mernDB
+      #Notice the hostname is mongo, not localhost → that’s because Docker Compose creates an internal network where services can talk to each other by service name.   
+    depends_on:   #Tells Docker that the backend container should start after the mongo service is up.
+      - mongo
 
   frontend:
-    container_name: frontend
-    build: ./frontend
+    build: 
+      context: ./frontend  #Builds the frontend image from the ./frontend/Dockerfile.
+
+      args:
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL}           # Passes the backend URL as a build argument to the frontend Dockerfile.
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID} # Passes the Google Client ID as a build argument to the frontend Dockerfile.
+
     env_file:
-      - ./frontend/.env
+      - ./frontend/.env                         #Loads environment variables from the .env file in the frontend folder (at runtime).   
+    container_name: mern-frontend
     ports:
-      - "5173:5173"
-    restart: unless-stopped
+      - "5173:80"   # host:container -> host uses http://localhost:3000      
+    depends_on:
+      - backend     #Ensures backend starts before frontend.
+
+  mongo:
+    image: mongo:latest   #Pulls the official MongoDB 6.0 image from Docker Hub
+    container_name: mern-mongo
+    restart: always        #If container stops or crashes, Docker restarts it automatically
+    ports:
+      - "27017:27017"   #Exposes MongoDB on your local machine at localhost:27017
+    volumes:
+      - mongo-data:/data/db       #Mounts a named volume so your DB data survives even if the container is removed.
 
 volumes:
-  data:
+  mongo-data:
+#Defines a named volume called mongo-data.
+#This is where Mongo stores persistent data → /var/lib/docker/volumes/mongo-data/_data.
+
+# This is a named volume (Docker-managed), not a path on your Windows filesystem.
+# Docker will store the data inside Docker’s internal storage, usually under:
+# C:\ProgramData\Docker\volumes\mongo-data\_data # So MongoDB data persists even if you restart containers.
